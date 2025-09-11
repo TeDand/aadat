@@ -1,4 +1,3 @@
-import 'package:english_words/english_words.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -27,8 +26,15 @@ class MyApp extends StatelessWidget {
 class MyAppState extends ChangeNotifier {
   var habits = <String>[];
 
+  GlobalKey<AnimatedListState> historyListKey = GlobalKey<AnimatedListState>();
+
   void addHabit(String inputText) {
-    habits.add(inputText);
+    habits.insert(0, inputText); // insert at the beginning
+    if (historyListKey.currentState != null) {
+      historyListKey.currentState?.insertItem(0); // animate at index 0
+    }
+
+    notifyListeners(); // optional, only if other widgets need to update
   }
 }
 
@@ -47,7 +53,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 0:
         page = GeneratorPage();
       case 1:
-        page = FavouritesPage();
+        page = HabitsPage();
       default:
         throw UnimplementedError('no widget for $selectedIndex');
     }
@@ -92,50 +98,40 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class GeneratorPage extends StatefulWidget {
-  @override
-  State<GeneratorPage> createState() => _GeneratorPageState();
-}
-
-class _GeneratorPageState extends State<GeneratorPage> {
-  final _controller = TextEditingController();
-
+class GeneratorPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          BigCard(controller: _controller),
           SizedBox(height: 10),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  final inputText = _controller.text;
-                  appState.addHabit(inputText);
-                },
-                icon: Icon(Icons.add),
-                label: Text('Add'),
-              ),
-            ],
-          ),
+          Padding(padding: const EdgeInsets.all(10.0), child: BigCard()),
+          Expanded(flex: 3, child: HabitsListView()),
         ],
       ),
     );
   }
 }
 
-class BigCard extends StatelessWidget {
-  const BigCard({super.key, required this.controller});
+class BigCard extends StatefulWidget {
+  const BigCard({super.key});
 
-  final TextEditingController controller;
+  @override
+  State<BigCard> createState() => _BigCardState();
+}
+
+class _BigCardState extends State<BigCard> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose(); // free memory
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    var appState = context.watch<MyAppState>();
     final theme = Theme.of(context);
     final style = theme.textTheme.displayMedium!.copyWith(
       color: theme.colorScheme.onPrimary,
@@ -146,7 +142,11 @@ class BigCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: TextField(
-          controller: controller,
+          onSubmitted: (inputText) {
+            appState.addHabit(inputText);
+            _controller.clear();
+          },
+          controller: _controller,
           style: style,
           decoration: InputDecoration(
             labelText: 'Enter your text',
@@ -158,7 +158,72 @@ class BigCard extends StatelessWidget {
   }
 }
 
-class FavouritesPage extends StatelessWidget {
+class HabitsListView extends StatefulWidget {
+  const HabitsListView({super.key});
+
+  @override
+  State<HabitsListView> createState() => _HabitsListViewState();
+}
+
+class _HabitsListViewState extends State<HabitsListView> {
+  /// Used to "fade out" the history items at the bottom, to suggest continuation.
+  static const Gradient _maskingGradient = LinearGradient(
+    // This gradient goes from fully transparent to fully opaque black...
+    colors: [Colors.black, Colors.transparent],
+    // ... from the top (transparent) to half (0.5) of the way to the bottom.
+    stops: [0.0, 0.5],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  final _key = GlobalKey<AnimatedListState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Optional: pass the key to the app state if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MyAppState>().historyListKey = _key;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<MyAppState>();
+
+    return ShaderMask(
+      shaderCallback: (bounds) => _maskingGradient.createShader(bounds),
+      // This blend mode takes the opacity of the shader (i.e. our gradient)
+      // and applies it to the destination (i.e. our animated list).
+      blendMode: BlendMode.dstIn,
+      child: AnimatedList(
+        key: _key,
+        reverse: false,
+        padding: EdgeInsets.only(top: 100),
+        initialItemCount: appState.habits.length,
+        itemBuilder: (context, index, animation) {
+          final habit = appState.habits[index];
+          return SizeTransition(
+            sizeFactor: animation,
+            child: Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  print("habit clicked");
+                },
+                label: Text(
+                  habit.toLowerCase(),
+                  semanticsLabel: habit.toLowerCase(),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class HabitsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
