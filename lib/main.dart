@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'aadat',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         ),
         home: MyHomePage(),
       ),
@@ -27,15 +27,43 @@ class MyAppState extends ChangeNotifier {
   var habits = <String>[];
 
   GlobalKey<AnimatedListState> historyListKey = GlobalKey<AnimatedListState>();
-
+  String? message;
   void addHabit(String inputText) {
+    final habit = inputText.trim();
+
+    if (habits.any((h) => h.toLowerCase() == habit.toLowerCase())) {
+      _setMessage("habit already exists!");
+      notifyListeners();
+      return;
+    }
+
+    if (habit.isEmpty) {
+      _setMessage("cannot add an empty habit");
+      return; // do nothing
+    }
+
     habits.insert(0, inputText); // insert at the beginning
     if (historyListKey.currentState != null) {
       historyListKey.currentState?.insertItem(0); // animate at index 0
     }
 
+    _setMessage("habit added!");
     notifyListeners(); // optional, only if other widgets need to update
   }
+
+  void _setMessage(String msg) {
+    message = msg;
+    notifyListeners();
+
+    // Clear after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (message == msg) { // avoid overwriting a new message
+        message = null;
+        notifyListeners();
+      }
+    });
+  }
+
 }
 
 class MyHomePage extends StatefulWidget {
@@ -136,23 +164,38 @@ class _BigCardState extends State<BigCard> {
     final style = theme.textTheme.displayMedium!.copyWith(
       color: theme.colorScheme.onPrimary,
     );
+    final focusNode = FocusNode();
 
     return Card(
       color: theme.colorScheme.primary,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: TextField(
-          onSubmitted: (inputText) {
-            appState.addHabit(inputText);
-            _controller.clear();
-          },
-          controller: _controller,
-          style: style,
-          decoration: InputDecoration(
-            labelText: 'Enter your text',
-            border: OutlineInputBorder(),
+      child: Column(
+        children: [
+          TextField(
+            controller: _controller,
+            focusNode: focusNode,
+            onSubmitted: (inputText) {
+              appState.addHabit(inputText);
+              _controller.clear();
+              focusNode.requestFocus(); // keep focus on TextField
+            },
+            style: style,
+            decoration: InputDecoration(
+              labelText: 'Type your habit here',
+              border: OutlineInputBorder(),
+            ),
           ),
-        ),
+          if (appState.message != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            appState.message!,
+            style: TextStyle(
+              color: appState.message!.contains("added!")
+                  ? Colors.green
+                  : const Color.fromARGB(255, 246, 246, 245),
+            ),
+          ),
+        ],
+        ],
       ),
     );
   }
@@ -211,8 +254,8 @@ class _HabitsListViewState extends State<HabitsListView> {
                   print("habit clicked");
                 },
                 label: Text(
-                  habit.toLowerCase(),
-                  semanticsLabel: habit.toLowerCase(),
+                  habit,
+                  semanticsLabel: habit,
                 ),
               ),
             ),
@@ -238,13 +281,13 @@ class HabitsPage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Text(
             'You have '
-            '${appState.habits.length} habits:',
+            '${appState.habits.length} habit(s):',
           ),
         ),
         for (var habit in appState.habits)
           ListTile(
             leading: Icon(Icons.favorite),
-            title: Text(habit.toLowerCase()),
+            title: Text(habit),
           ),
       ],
     );
