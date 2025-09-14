@@ -1,11 +1,8 @@
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class HabitsListView extends StatefulWidget {
-  const HabitsListView({super.key, required this.viewModel});
-
-  final HomeViewModel viewModel;
-
   @override
   State<HabitsListView> createState() => _HabitsListViewState();
 }
@@ -28,14 +25,17 @@ class _HabitsListViewState extends State<HabitsListView> {
     super.initState();
     // Optional: pass the key to the app state if needed
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // context.read<HomeViewModel>().historyListKey = _key;
-      widget.viewModel.historyListKey = _key;
+      context.read<HomeViewModel>().historyListKey = _key;
+
+      for (int i = 0; i < context.read<HomeViewModel>().habits.length; i++) {
+        _key.currentState?.insertItem(i);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // final appState = context.watch<HomeViewModel>();
+    final homeViewModel = Provider.of<HomeViewModel>(context);
 
     return ShaderMask(
       shaderCallback: (bounds) => _maskingGradient.createShader(bounds),
@@ -46,9 +46,9 @@ class _HabitsListViewState extends State<HabitsListView> {
         key: _key,
         reverse: false,
         padding: EdgeInsets.only(top: 100),
-        initialItemCount: widget.viewModel.habits.length,
+        initialItemCount: homeViewModel.habits.length,
         itemBuilder: (context, index, animation) {
-          final habit = widget.viewModel.habits[index];
+          final habit = homeViewModel.habits[index];
           return SizeTransition(
             sizeFactor: animation,
             child: Center(
@@ -56,7 +56,7 @@ class _HabitsListViewState extends State<HabitsListView> {
                 onPressed: () {
                   print("habit clicked");
                 },
-                label: Text(habit, semanticsLabel: habit),
+                label: Text(habit.title, semanticsLabel: habit.title),
               ),
             ),
           );

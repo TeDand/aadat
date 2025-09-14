@@ -1,11 +1,9 @@
+import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class BigCard extends StatefulWidget {
-  const BigCard({super.key, required this.viewModel});
-
-  final HomeViewModel viewModel;
-
   @override
   State<BigCard> createState() => _BigCardState();
 }
@@ -21,7 +19,7 @@ class _BigCardState extends State<BigCard> {
 
   @override
   Widget build(BuildContext context) {
-    // var appState = context.watch<HomeViewModel>();
+    final homeViewModel = Provider.of<HomeViewModel>(context);
     final theme = Theme.of(context);
     final style = theme.textTheme.displayMedium!.copyWith(
       color: theme.colorScheme.onPrimary,
@@ -36,7 +34,9 @@ class _BigCardState extends State<BigCard> {
             controller: _controller,
             focusNode: focusNode,
             onSubmitted: (inputText) {
-              widget.viewModel.addHabit(inputText);
+              homeViewModel.addHabit(
+                Habit(title: inputText, description: 'tmp'),
+              );
               _controller.clear();
               focusNode.requestFocus(); // keep focus on TextField
             },
@@ -46,12 +46,12 @@ class _BigCardState extends State<BigCard> {
               border: OutlineInputBorder(),
             ),
           ),
-          if (widget.viewModel.message != null) ...[
+          if (homeViewModel.message != null) ...[
             const SizedBox(height: 8),
             Text(
-              widget.viewModel.message!,
+              homeViewModel.message!,
               style: TextStyle(
-                color: widget.viewModel.message!.contains("added!")
+                color: homeViewModel.message!.contains("added!")
                     ? Colors.green
                     : const Color.fromARGB(255, 246, 246, 245),
               ),
