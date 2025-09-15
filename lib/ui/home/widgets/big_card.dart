@@ -10,21 +10,22 @@ class BigCard extends StatefulWidget {
 
 class _BigCardState extends State<BigCard> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void dispose() {
-    _controller.dispose(); // free memory
+    _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final homeViewModel = Provider.of<HomeViewModel>(context);
+    final homeViewModel = context.watch<HomeViewModel>();
     final theme = Theme.of(context);
     final style = theme.textTheme.displayMedium!.copyWith(
       color: theme.colorScheme.onPrimary,
     );
-    final focusNode = FocusNode();
 
     return Card(
       color: theme.colorScheme.primary,
@@ -32,13 +33,13 @@ class _BigCardState extends State<BigCard> {
         children: [
           TextField(
             controller: _controller,
-            focusNode: focusNode,
+            focusNode: _focusNode,
             onSubmitted: (inputText) {
               homeViewModel.addHabit(
                 Habit(title: inputText, description: 'tmp'),
               );
               _controller.clear();
-              focusNode.requestFocus(); // keep focus on TextField
+              _focusNode.requestFocus();
             },
             style: style,
             decoration: InputDecoration(

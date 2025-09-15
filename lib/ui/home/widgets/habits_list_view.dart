@@ -1,3 +1,4 @@
+import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -19,24 +20,41 @@ class _HabitsListViewState extends State<HabitsListView> {
   );
 
   final _key = GlobalKey<AnimatedListState>();
+  final List<Habit> _displayedHabits =
+      []; // local source of truth to display animated list
 
   @override
   void initState() {
     super.initState();
-    // Optional: pass the key to the app state if needed
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HomeViewModel>().historyListKey = _key;
 
-      for (int i = 0; i < context.read<HomeViewModel>().habits.length; i++) {
-        _key.currentState?.insertItem(i);
+    final homeViewModel = context.read<HomeViewModel>();
+
+    // On first build, we want to animate all existing habits
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Insert in reverse order to have the newest at the top
+      final habits = homeViewModel.habits;
+      for (int i = habits.length - 1; i >= 0; i--) {
+        _insertItem(habits[i]);
+      }
+    });
+
+    homeViewModel.addListener(() {
+      // On every change, we want to add any new habits
+      for (var habit in homeViewModel.habits) {
+        if (!_displayedHabits.contains(habit)) {
+          _insertItem(habit);
+        }
       }
     });
   }
 
+  void _insertItem(Habit habit) {
+    _displayedHabits.insert(0, habit); // insert habit at the top of local list
+    _key.currentState?.insertItem(0, duration: Duration(milliseconds: 300));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final homeViewModel = Provider.of<HomeViewModel>(context);
-
     return ShaderMask(
       shaderCallback: (bounds) => _maskingGradient.createShader(bounds),
       // This blend mode takes the opacity of the shader (i.e. our gradient)
@@ -46,9 +64,9 @@ class _HabitsListViewState extends State<HabitsListView> {
         key: _key,
         reverse: false,
         padding: EdgeInsets.only(top: 100),
-        initialItemCount: homeViewModel.habits.length,
+        initialItemCount: 0, // start empty, items added in initState
         itemBuilder: (context, index, animation) {
-          final habit = homeViewModel.habits[index];
+          final habit = _displayedHabits[index];
           return SizeTransition(
             sizeFactor: animation,
             child: Center(

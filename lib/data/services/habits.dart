@@ -16,6 +16,6 @@ class HabitService {
     // Simulating network request
     await Future.delayed(Duration(milliseconds: 10));
     // In a real app, you would send a POST request to your backend here
-    habits.add(inputHabit);
+    habits.insert(0, inputHabit); // Add to the top of the list
   }
 }

@@ -1,7 +1,6 @@
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/home_page.dart';
 import 'package:flutter/material.dart';
-// import 'package:provider/provider.dart';
 import 'package:aadat/ui/habits/widgets/habits_page.dart';
 import 'package:provider/provider.dart';
 
