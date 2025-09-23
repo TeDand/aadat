@@ -53,6 +53,89 @@ class _HabitsListViewState extends State<HabitsListView> {
     _key.currentState?.insertItem(0, duration: Duration(milliseconds: 300));
   }
 
+  void _showHabitEditor(BuildContext context, Habit habit) {
+    final habitService = context.read<HomeViewModel>();
+    final titleController = TextEditingController(text: habit.title);
+    final descriptionController = TextEditingController(
+      text: habit.description,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // lets it take up most of the screen
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Edit Habit",
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    SizedBox(height: 16),
+
+                    TextField(
+                      controller: titleController,
+                      decoration: InputDecoration(
+                        labelText: "Title",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+
+                    SizedBox(height: 16),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: InputDecoration(
+                        labelText: "Description",
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          child: Text("Cancel"),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        ElevatedButton(
+                          child: Text("Save"),
+                          onPressed: () {
+                            habit.title = titleController.text;
+                            habit.description = descriptionController.text;
+                            habitService.updateHabit(habit);
+                            setState(() {});
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ShaderMask(
@@ -72,6 +155,7 @@ class _HabitsListViewState extends State<HabitsListView> {
             child: Center(
               child: TextButton.icon(
                 onPressed: () {
+                  _showHabitEditor(context, habit);
                   print("habit clicked");
                 },
                 label: Text(habit.title, semanticsLabel: habit.title),

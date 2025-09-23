@@ -1,9 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 
 class Habit {
-  final int? id;
-  final String title;
-  final String description;
+  int? id;
+  String title;
+  String description;
   bool isFavorite;
   DateTime? createdTime;
 

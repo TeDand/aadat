@@ -60,4 +60,16 @@ class HomeViewModel extends ChangeNotifier {
       }
     });
   }
+
+  Future<void> deleteHabit(Habit habit) async {
+    await _habitService.deleteHabit(habit);
+    _setMessage("habit deleted!");
+    notifyListeners();
+  }
+
+  Future<void> updateHabit(Habit habit) async {
+    await _habitService.updateHabit(habit);
+    _setMessage("habit updated!");
+    notifyListeners();
+  }
 }
