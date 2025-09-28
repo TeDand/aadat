@@ -32,13 +32,13 @@ MVVM is a software architecture pattern used in app development to separate conc
 - Responsible for fetching, storing, and processing data.
 - It doesn't have any information about the UI 
 
-#### View 
+#### View 
 
 - The UI 
 - Shows information to the users, and captures user input 
 - It doesn't contain any logic, just displays what it receives from the ViewModel.
 
-#### ViewModel 
+#### ViewModel 
 
 - The middle man, and the state holder 
 - Knows about the Model and transforms its raw data into something the View can use 
@@ -51,10 +51,10 @@ MVVM is a software architecture pattern used in app development to separate conc
 // TODO 
 
 
-### App Layout and design 
+### App Layout and design 
 
 // In progress 
 
-### Stretch goals 
+### Stretch goals 
 
 1. AI integration 
