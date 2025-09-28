@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class BigCard extends StatefulWidget {
+  const BigCard({super.key});
+
   @override
   State<BigCard> createState() => _BigCardState();
 }
@@ -23,9 +25,6 @@ class _BigCardState extends State<BigCard> {
   Widget build(BuildContext context) {
     final homeViewModel = context.watch<HomeViewModel>();
     final theme = Theme.of(context);
-    final style = theme.textTheme.displayMedium!.copyWith(
-      color: theme.colorScheme.onPrimary,
-    );
 
     return Card(
       color: theme.colorScheme.primary,
@@ -35,14 +34,14 @@ class _BigCardState extends State<BigCard> {
             controller: _controller,
             focusNode: _focusNode,
             onSubmitted: (inputText) {
-              homeViewModel.addHabit(
-                Habit(title: inputText, description: 'tmp'),
-              );
+              homeViewModel.addHabit(Habit(title: inputText, description: ''));
               _controller.clear();
               _focusNode.requestFocus();
             },
-            style: style,
-            decoration: InputDecoration(
+            style: theme.textTheme.displayMedium!.copyWith(
+              color: theme.colorScheme.onPrimary,
+            ),
+            decoration: const InputDecoration(
               labelText: 'Type your habit here',
               border: OutlineInputBorder(),
             ),
@@ -54,7 +53,7 @@ class _BigCardState extends State<BigCard> {
               style: TextStyle(
                 color: homeViewModel.message!.contains("added!")
                     ? Colors.green
-                    : const Color.fromARGB(255, 246, 246, 245),
+                    : Colors.red,
               ),
             ),
           ],

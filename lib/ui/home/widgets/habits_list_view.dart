@@ -3,58 +3,11 @@ import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class HabitsListView extends StatefulWidget {
-  @override
-  State<HabitsListView> createState() => _HabitsListViewState();
-}
-
-class _HabitsListViewState extends State<HabitsListView> {
-  /// Used to "fade out" the history items at the bottom, to suggest continuation.
-  static const Gradient _maskingGradient = LinearGradient(
-    // This gradient goes from fully transparent to fully opaque black...
-    colors: [Colors.black, Colors.transparent],
-    // ... from the top (transparent) to half (0.5) of the way to the bottom.
-    stops: [0.0, 0.5],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  );
-
-  final _key = GlobalKey<AnimatedListState>();
-  final List<Habit> _displayedHabits =
-      []; // local source of truth to display animated list
-
-  @override
-  void initState() {
-    super.initState();
-
-    final homeViewModel = context.read<HomeViewModel>();
-
-    // On first build, we want to animate all existing habits
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Insert in reverse order to have the newest at the top
-      final habits = homeViewModel.habits;
-      for (int i = habits.length - 1; i >= 0; i--) {
-        _insertItem(habits[i]);
-      }
-    });
-
-    homeViewModel.addListener(() {
-      // On every change, we want to add any new habits
-      for (var habit in homeViewModel.habits) {
-        if (!_displayedHabits.contains(habit)) {
-          _insertItem(habit);
-        }
-      }
-    });
-  }
-
-  void _insertItem(Habit habit) {
-    _displayedHabits.insert(0, habit); // insert habit at the top of local list
-    _key.currentState?.insertItem(0, duration: Duration(milliseconds: 300));
-  }
+class HabitsListView extends StatelessWidget {
+  const HabitsListView({super.key});
 
   void _showHabitEditor(BuildContext context, Habit habit) {
-    final habitService = context.read<HomeViewModel>();
+    final homeViewModel = context.read<HomeViewModel>();
     final titleController = TextEditingController(text: habit.title);
     final descriptionController = TextEditingController(
       text: habit.description,
@@ -62,75 +15,69 @@ class _HabitsListViewState extends State<HabitsListView> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // lets it take up most of the screen
-      shape: RoundedRectangleBorder(
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          builder: (context, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 20,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Edit Habit",
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    SizedBox(height: 16),
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Edit Habit",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
 
-                    TextField(
-                      controller: titleController,
-                      decoration: InputDecoration(
-                        labelText: "Title",
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    SizedBox(height: 16),
-                    TextField(
-                      controller: descriptionController,
-                      decoration: InputDecoration(
-                        labelText: "Description",
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 3,
-                    ),
-
-                    SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          child: Text("Cancel"),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        ElevatedButton(
-                          child: Text("Save"),
-                          onPressed: () {
-                            habit.title = titleController.text;
-                            habit.description = descriptionController.text;
-                            habitService.updateHabit(habit);
-                            setState(() {});
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: "Title",
+                  border: OutlineInputBorder(),
                 ),
               ),
-            );
-          },
+
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: "Description",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    child: const Text("Cancel"),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  ElevatedButton(
+                    child: const Text("Save"),
+                    onPressed: () {
+                      final updated = habit.copy(
+                        title: titleController.text,
+                        description: descriptionController.text,
+                      );
+                      homeViewModel.updateHabit(updated);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
@@ -138,32 +85,20 @@ class _HabitsListViewState extends State<HabitsListView> {
 
   @override
   Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (bounds) => _maskingGradient.createShader(bounds),
-      // This blend mode takes the opacity of the shader (i.e. our gradient)
-      // and applies it to the destination (i.e. our animated list).
-      blendMode: BlendMode.dstIn,
-      child: AnimatedList(
-        key: _key,
-        reverse: false,
-        padding: EdgeInsets.only(top: 100),
-        initialItemCount: 0, // start empty, items added in initState
-        itemBuilder: (context, index, animation) {
-          final habit = _displayedHabits[index];
-          return SizeTransition(
-            sizeFactor: animation,
-            child: Center(
-              child: TextButton.icon(
-                onPressed: () {
-                  _showHabitEditor(context, habit);
-                  print("habit clicked");
-                },
-                label: Text(habit.title, semanticsLabel: habit.title),
-              ),
-            ),
-          );
-        },
-      ),
+    final habits = context.watch<HomeViewModel>().habits;
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 100),
+      itemCount: habits.length,
+      itemBuilder: (context, index) {
+        final habit = habits[index];
+        return Center(
+          child: TextButton.icon(
+            onPressed: () => _showHabitEditor(context, habit),
+            label: Text(habit.title, semanticsLabel: habit.title),
+          ),
+        );
+      },
     );
   }
 }

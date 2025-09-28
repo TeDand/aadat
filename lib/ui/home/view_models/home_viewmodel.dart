@@ -5,10 +5,12 @@ import '../../../data/services/habits.dart';
 class HomeViewModel extends ChangeNotifier {
   final HabitService _habitService = HabitService();
   bool _loading = false;
-  String? message;
+  String? _message;
+  List<Habit> _habits = [];
 
-  List<Habit> get habits => _habitService.habits;
+  List<Habit> get habits => List.unmodifiable(_habits);
   bool get loading => _loading;
+  String? get message => _message;
 
   HomeViewModel() {
     fetchHabits();
@@ -18,58 +20,44 @@ class HomeViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
 
-    _habitService.habits = await _habitService.fetchHabits();
+    _habits = await _habitService.fetchHabits();
 
     _loading = false;
     notifyListeners();
   }
 
   Future<void> addHabit(Habit habit) async {
-    _habitService.habits = await _habitService.fetchHabits();
+    final result = await _habitService.addHabit(habit);
+    _setMessage(result);
 
-    if (_habitService.habits.any(
-      (h) => h.title.toLowerCase() == habit.title.toLowerCase(),
-    )) {
-      _setMessage("habit already exists!");
-      notifyListeners();
-      return;
-    }
-
-    if (habit.title.isEmpty) {
-      _setMessage("cannot add an empty habit");
-      notifyListeners();
-      return;
-    }
-
-    await _habitService.addHabit(habit);
-
-    _setMessage("habit added!");
-    notifyListeners();
-  }
-
-  void _setMessage(String msg) {
-    message = msg;
-    notifyListeners();
-
-    // Clear after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (message == msg) {
-        // avoid overwriting a new message
-        message = null;
-        notifyListeners();
-      }
-    });
+    await fetchHabits();
   }
 
   Future<void> deleteHabit(Habit habit) async {
     await _habitService.deleteHabit(habit);
     _setMessage("habit deleted!");
-    notifyListeners();
+
+    await fetchHabits();
   }
 
   Future<void> updateHabit(Habit habit) async {
-    await _habitService.updateHabit(habit);
-    _setMessage("habit updated!");
+    final result = await _habitService.updateHabit(habit);
+    _setMessage(result);
+
+    await fetchHabits();
+  }
+
+  void _setMessage(String msg) {
+    _message = msg;
     notifyListeners();
+
+    // Clear after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_message == msg) {
+        // avoid overwriting a new message
+        _message = null;
+        notifyListeners();
+      }
+    });
   }
 }

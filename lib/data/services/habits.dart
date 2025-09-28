@@ -1,38 +1,48 @@
 import '../repositories/habit_model.dart';
 
 class HabitService {
-  List<Habit> habits = [
+  List<Habit> _habits = [
     Habit(id: 1, title: 'Clean Code', description: 'Clean up code'),
     Habit(id: 2, title: 'Go Running', description: 'Run 10 miles'),
   ];
 
+  List<Habit> get habits => List.unmodifiable(_habits);
+
   Future<List<Habit>> fetchHabits() async {
-    // Simulating network request
-    await Future.delayed(Duration(milliseconds: 10));
-    return habits;
+    return _habits;
   }
 
-  Future<void> addHabit(Habit inputHabit) async {
-    // Simulating network request
-    await Future.delayed(Duration(milliseconds: 10));
-    // In a real app, you would send a POST request to your backend here
-    habits.insert(0, inputHabit); // Add to the top of the list
+  Future<String> addHabit(Habit inputHabit) async {
+    if (inputHabit.title.isEmpty) return "cannot add an empty habit";
+
+    if (_habits.any(
+      (h) => h.title.toLowerCase() == inputHabit.title.toLowerCase(),
+    )) {
+      return "habit already exists!";
+    }
+
+    _habits.insert(0, inputHabit);
+    return "habit added!";
   }
 
   Future<void> deleteHabit(Habit habit) async {
-    // Simulating network request
-    await Future.delayed(Duration(milliseconds: 10));
-    // In a real app, you would send a DELETE request to your backend here
-    habits.remove(habit);
+    _habits.removeWhere((h) => h.id == habit.id);
   }
 
-  Future<void> updateHabit(Habit updatedHabit) async {
-    // Simulating network request
-    await Future.delayed(Duration(milliseconds: 10));
-    // In a real app, you would send a PUT/PATCH request to your backend here
-    final index = habits.indexWhere((habit) => habit.id == updatedHabit.id);
-    if (index != -1) {
-      habits[index] = updatedHabit;
+  Future<String> updateHabit(Habit updatedHabit) async {
+    if (updatedHabit.title.isEmpty) return "habit cannot be empty";
+
+    if (_habits.any(
+      (h) => h.title.toLowerCase() == updatedHabit.title.toLowerCase(),
+    )) {
+      return "habit already exists!";
     }
+    // replace old habit with updated one
+    final index = _habits.indexWhere((h) => h.id == updatedHabit.id);
+    if (index != -1) {
+      _habits[index] = updatedHabit;
+    }
+
+    return "habit updated!";
   }
 }

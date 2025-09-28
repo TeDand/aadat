@@ -44,7 +44,7 @@ class _RouterState extends State<Router> {
         // TODO: add habits view model
         page = HabitsPage();
       default:
-        throw UnimplementedError('no widget for $selectedIndex');
+        page = HomePage();
     }
 
     return LayoutBuilder(
