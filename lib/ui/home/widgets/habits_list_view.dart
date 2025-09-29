@@ -1,7 +1,8 @@
-import 'package:aadat/data/repositories/habit_model.dart';
-import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:aadat/data/repositories/habit_model.dart';
+import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
+import 'package:aadat/ui/home/widgets/widget_card.dart';
 
 class HabitsListView extends StatelessWidget {
   const HabitsListView({super.key});
@@ -93,9 +94,9 @@ class HabitsListView extends StatelessWidget {
       itemBuilder: (context, index) {
         final habit = habits[index];
         return Center(
-          child: TextButton.icon(
-            onPressed: () => _showHabitEditor(context, habit),
-            label: Text(habit.title, semanticsLabel: habit.title),
+          child: HabitCard(
+            habit: habit,
+            onTap: () => _showHabitEditor(context, habit),
           ),
         );
       },
