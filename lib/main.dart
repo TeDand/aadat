@@ -27,6 +27,8 @@ class MainApp extends StatelessWidget {
 }
 
 class Router extends StatefulWidget {
+  const Router({super.key});
+
   @override
   State<Router> createState() => _RouterState();
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 class HabitsPage extends StatelessWidget {
+  const HabitsPage({super.key});
+
+  // TODO: rewrite with view model to get functioning habits page
   @override
   Widget build(BuildContext context) {
     // var appState = context.watch<MyAppState>();
