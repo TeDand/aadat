@@ -34,8 +34,8 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<void> deleteHabit(Habit habit) async {
-    await _habitService.deleteHabit(habit);
-    _setMessage("habit deleted!");
+    final result = await _habitService.deleteHabit(habit);
+    _setMessage(result);
 
     await fetchHabits();
   }

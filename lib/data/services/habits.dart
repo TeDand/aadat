@@ -1,10 +1,7 @@
 import '../repositories/habit_model.dart';
 
 class HabitService {
-  List<Habit> _habits = [
-    Habit(id: 1, title: 'Clean Code', description: 'Clean up code'),
-    Habit(id: 2, title: 'Go Running', description: 'Run 10 miles'),
-  ];
+  List<Habit> _habits = [];
 
   List<Habit> get habits => List.unmodifiable(_habits);
 
@@ -25,8 +22,9 @@ class HabitService {
     return "habit added!";
   }
 
-  Future<void> deleteHabit(Habit habit) async {
+  Future<String> deleteHabit(Habit habit) async {
     _habits.removeWhere((h) => h.id == habit.id);
+    return "habit deleted!";
   }
 
   Future<String> updateHabit(Habit updatedHabit) async {
