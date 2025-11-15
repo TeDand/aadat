@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
-import 'package:aadat/ui/home/widgets/widget_card.dart';
+import 'package:aadat/ui/home/widgets/habit_card.dart';
 
 class HabitsListView extends StatelessWidget {
   const HabitsListView({super.key});
