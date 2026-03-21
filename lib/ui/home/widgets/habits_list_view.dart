@@ -3,81 +3,36 @@ import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-class HabitsListView extends StatelessWidget {
+enum HabitsGroupBy {
+  recurrence,
+  category,
+}
+
+class HabitsListView extends StatefulWidget {
   const HabitsListView({super.key});
+
+  @override
+  State<HabitsListView> createState() => _HabitsListViewState();
+}
+
+class _HabitsListViewState extends State<HabitsListView> {
+  HabitsGroupBy _groupBy = HabitsGroupBy.recurrence;
 
   void _showHabitEditor(BuildContext context, Habit habit) {
     final homeViewModel = context.read<HomeViewModel>();
-    final titleController = TextEditingController(text: habit.title);
-    final descriptionController = TextEditingController(
-      text: habit.description,
-    );
-
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Edit Habit",
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 16),
-
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: "Title",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: "Description",
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    child: const Text("Cancel"),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  ElevatedButton(
-                    child: const Text("Save"),
-                    onPressed: () {
-                      final updated = habit.copy(
-                        title: titleController.text,
-                        description: descriptionController.text,
-                      );
-                      homeViewModel.updateHabit(updated);
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
+        return _HabitEditorSheet(
+          habit: habit,
+          onSave: (updated) {
+            homeViewModel.updateHabit(updated);
+            Navigator.of(context).pop();
+          },
         );
       },
     );
@@ -86,19 +41,421 @@ class HabitsListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final habits = context.watch<HomeViewModel>().habits;
+    final theme = Theme.of(context);
+    final tiles = habits.isEmpty
+        ? <Widget>[]
+        : _buildTiles(context, habits, theme);
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 100),
-      itemCount: habits.length,
-      itemBuilder: (context, index) {
-        final habit = habits[index];
-        return Center(
-          child: TextButton.icon(
-            onPressed: () => _showHabitEditor(context, habit),
-            label: Text(habit.title, semanticsLabel: habit.title),
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                Text(
+                  'Group by',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                DropdownButton<HabitsGroupBy>(
+                  value: _groupBy,
+                  onChanged: (v) {
+                    if (v != null) setState(() => _groupBy = v);
+                  },
+                  items: const [
+                    DropdownMenuItem(
+                      value: HabitsGroupBy.recurrence,
+                      child: Text('Recurrence'),
+                    ),
+                    DropdownMenuItem(
+                      value: HabitsGroupBy.category,
+                      child: Text('Category'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ),
+        if (habits.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: Text('No habits yet.')),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(tiles),
+            ),
+          ),
+      ],
+    );
+  }
+
+  List<Widget> _buildTiles(
+    BuildContext context,
+    List<Habit> habits,
+    ThemeData theme,
+  ) {
+    final sorted = [...habits]
+      ..sort(
+        (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+      );
+
+    switch (_groupBy) {
+      case HabitsGroupBy.recurrence:
+        return _sectionsByRecurrence(context, sorted, theme);
+      case HabitsGroupBy.category:
+        return _sectionsByCategory(context, sorted, theme);
+    }
+  }
+
+  List<Widget> _sectionsByRecurrence(
+    BuildContext context,
+    List<Habit> habits,
+    ThemeData theme,
+  ) {
+    const order = HabitRecurrence.values;
+    final out = <Widget>[];
+    var first = true;
+    for (final rec in order) {
+      final section = habits.where((h) => h.recurrence == rec).toList();
+      if (section.isEmpty) continue;
+      if (!first) {
+        out.add(const SizedBox(height: 16));
+      }
+      first = false;
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            rec.displayName,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+        ),
+      );
+      for (final h in section) {
+        out.add(_habitTile(context, h, theme));
+      }
+    }
+    return out;
+  }
+
+  List<Widget> _sectionsByCategory(
+    BuildContext context,
+    List<Habit> habits,
+    ThemeData theme,
+  ) {
+    final map = <String, List<Habit>>{};
+    for (final h in habits) {
+      final raw = h.category.trim();
+      final key =
+          raw.isEmpty ? '___uncategorized___' : raw.toLowerCase();
+      map.putIfAbsent(key, () => []).add(h);
+    }
+    final keys = map.keys.toList()
+      ..sort((a, b) {
+        if (a == '___uncategorized___') return 1;
+        if (b == '___uncategorized___') return -1;
+        return a.compareTo(b);
+      });
+
+    final out = <Widget>[];
+    for (var i = 0; i < keys.length; i++) {
+      if (i > 0) out.add(const SizedBox(height: 16));
+      final key = keys[i];
+      final list = map[key]!;
+      final header = key == '___uncategorized___'
+          ? 'Uncategorized'
+          : (list.first.category.trim().isEmpty
+              ? 'Uncategorized'
+              : list.first.category.trim());
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            header,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+        ),
+      );
+      for (final h in list) {
+        out.add(_habitTile(context, h, theme));
+      }
+    }
+    return out;
+  }
+
+  Widget _habitTile(BuildContext context, Habit habit, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => _showHabitEditor(context, habit),
+          icon: Icon(
+            _iconForRecurrence(habit.recurrence),
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          label: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(habit.title, semanticsLabel: habit.title),
+              if (habit.description.isNotEmpty)
+                Text(
+                  habit.description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForRecurrence(HabitRecurrence r) {
+    switch (r) {
+      case HabitRecurrence.daily:
+        return Icons.today;
+      case HabitRecurrence.weekly:
+        return Icons.date_range;
+      case HabitRecurrence.monthly:
+        return Icons.calendar_month;
+    }
+  }
+}
+
+class _HabitEditorSheet extends StatefulWidget {
+  const _HabitEditorSheet({
+    required this.habit,
+    required this.onSave,
+  });
+
+  final Habit habit;
+  final void Function(Habit updated) onSave;
+
+  @override
+  State<_HabitEditorSheet> createState() => _HabitEditorSheetState();
+}
+
+class _HabitEditorSheetState extends State<_HabitEditorSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _categoryController;
+  late final FocusNode _categoryFocus;
+  late HabitRecurrence _recurrence;
+  DateTime? _startDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.habit.title);
+    _descriptionController = TextEditingController(
+      text: widget.habit.description,
+    );
+    _categoryController = TextEditingController(text: widget.habit.category);
+    _categoryFocus = FocusNode();
+    _recurrence = widget.habit.recurrence;
+    _startDate = widget.habit.startDate != null
+        ? habitDateOnly(widget.habit.startDate!)
+        : null;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _categoryController.dispose();
+    _categoryFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestions = context.watch<HomeViewModel>().categorySuggestions;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Edit Habit',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            RawAutocomplete<String>(
+              textEditingController: _categoryController,
+              focusNode: _categoryFocus,
+              optionsBuilder: (textEditingValue) {
+                final q = textEditingValue.text.toLowerCase();
+                if (textEditingValue.text.isEmpty) return suggestions;
+                return suggestions
+                    .where((s) => s.toLowerCase().contains(q))
+                    .take(12);
+              },
+              displayStringForOption: (s) => s,
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    hintText: 'e.g. Health, Work',
+                    border: OutlineInputBorder(),
+                  ),
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final opt = options.elementAt(index);
+                          return ListTile(
+                            dense: true,
+                            title: Text(opt),
+                            onTap: () => onSelected(opt),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Recurrence',
+                border: OutlineInputBorder(),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<HabitRecurrence>(
+                  isExpanded: true,
+                  value: _recurrence,
+                  items: HabitRecurrence.values
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(e.displayName),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _recurrence = v);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Start date'),
+              subtitle: Text(
+                _startDate == null
+                    ? 'No start date (applies from the beginning)'
+                    : '${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')}',
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_startDate != null)
+                    TextButton(
+                      onPressed: () => setState(() => _startDate = null),
+                      child: const Text('Clear'),
+                    ),
+                  TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _startDate ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setState(() => _startDate = habitDateOnly(picked));
+                      }
+                    },
+                    child: const Text('Set'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final updated = widget.habit.copy(
+                      title: _titleController.text,
+                      description: _descriptionController.text,
+                      category: _categoryController.text.trim(),
+                      recurrence: _recurrence,
+                      startDate: _startDate,
+                      clearStartDate: _startDate == null,
+                    );
+                    widget.onSave(updated);
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

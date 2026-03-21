@@ -12,32 +12,57 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late final HomeViewModel _viewModel;
-
-  @override
-  void initState() {
-    super.initState();
-    _viewModel = HomeViewModel();
-  }
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  final _categoryController = TextEditingController();
+  final _titleFocus = FocusNode();
+  final _descFocus = FocusNode();
+  final _categoryFocus = FocusNode();
+  HabitRecurrence _recurrence = HabitRecurrence.daily;
+  DateTime? _startDate;
 
   @override
   void dispose() {
-    _viewModel.dispose();
+    _titleController.dispose();
+    _descController.dispose();
+    _categoryController.dispose();
+    _titleFocus.dispose();
+    _descFocus.dispose();
+    _categoryFocus.dispose();
     super.dispose();
+  }
+
+  void _addHabit(HomeViewModel viewModel) {
+    if (_titleController.text.trim().isEmpty) return;
+    final newHabit = Habit(
+      title: _titleController.text.trim(),
+      description: _descController.text.trim(),
+      category: _categoryController.text.trim(),
+      recurrence: _recurrence,
+      startDate: _startDate,
+    );
+    viewModel.addHabit(newHabit);
+    _titleController.clear();
+    _descController.clear();
+    _categoryController.clear();
+    setState(() {
+      _recurrence = HabitRecurrence.daily;
+      _startDate = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
+    final categorySuggestions = viewModel.categorySuggestions;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 157, 187, 217),
+      backgroundColor: scheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text("Aadat"),
-        backgroundColor: const Color.fromARGB(255, 54, 116, 165),
-        centerTitle: true,
+        title: const Text('Aadat'),
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -45,43 +70,149 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
-              controller: titleController,
+              controller: _titleController,
+              focusNode: _titleFocus,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: "Habit title",
                 border: OutlineInputBorder(),
               ),
+              onSubmitted: (_) => _descFocus.requestFocus(),
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: descController,
+              controller: _descController,
+              focusNode: _descFocus,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: "Description",
                 border: OutlineInputBorder(),
               ),
               maxLines: 2,
+              onSubmitted: (_) => _categoryFocus.requestFocus(),
+            ),
+            const SizedBox(height: 12),
+            RawAutocomplete<String>(
+              textEditingController: _categoryController,
+              focusNode: _categoryFocus,
+              optionsBuilder: (textEditingValue) {
+                final q = textEditingValue.text.toLowerCase();
+                if (textEditingValue.text.isEmpty) return categorySuggestions;
+                return categorySuggestions
+                    .where((s) => s.toLowerCase().contains(q))
+                    .take(12);
+              },
+              displayStringForOption: (s) => s,
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    hintText: 'e.g. Health, Work (optional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) {},
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 4,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final opt = options.elementAt(index);
+                          return ListTile(
+                            dense: true,
+                            title: Text(opt),
+                            onTap: () => onSelected(opt),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Recurrence',
+                border: OutlineInputBorder(),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<HabitRecurrence>(
+                  isExpanded: true,
+                  value: _recurrence,
+                  items: HabitRecurrence.values
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(e.displayName),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _recurrence = v);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Start date'),
+              subtitle: Text(
+                _startDate == null
+                    ? 'Optional — habit applies from this day onward'
+                    : '${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')}',
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_startDate != null)
+                    TextButton(
+                      onPressed: () => setState(() => _startDate = null),
+                      child: const Text('Clear'),
+                    ),
+                  TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _startDate ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setState(() => _startDate = habitDateOnly(picked));
+                      }
+                    },
+                    child: const Text('Set'),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 54, 116, 165),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              onPressed: () {
-                if (titleController.text.isEmpty) return;
-                final newHabit = Habit(
-                  title: titleController.text,
-                  description: descController.text,
-                );
-                viewModel.addHabit(newHabit);
-                titleController.clear();
-                descController.clear();
-              },
-              child: const Text("Add Habit"),
+              onPressed: () => _addHabit(viewModel),
+              child: const Text('Add Habit'),
             ),
             const SizedBox(height: 24),
-            const Text(
-              "Your Habits:",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Text(
+              'Your habits',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 8),
             Expanded(
@@ -90,14 +221,22 @@ class _HomePageState extends State<HomePage> {
                 itemBuilder: (context, index) {
                   final habit = viewModel.habits[index];
                   return Card(
-                    color: Colors.white,
-                    elevation: 3,
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     child: ListTile(
                       title: Text(habit.title),
-                      subtitle: Text(habit.description),
+                      subtitle: Text(
+                        [
+                          if (habit.description.isNotEmpty) habit.description,
+                          '${habit.recurrence.displayName}'
+                              '${habit.category.isNotEmpty ? ' · ${habit.category}' : ''}',
+                          if (habit.startDate != null)
+                            'Starts ${habit.startDate!.year}-${habit.startDate!.month.toString().padLeft(2, '0')}-${habit.startDate!.day.toString().padLeft(2, '0')}',
+                        ].join('\n'),
+                      ),
+                      isThreeLine: habit.description.isNotEmpty ||
+                          habit.startDate != null,
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
+                        icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
                         onPressed: () => viewModel.deleteHabit(habit),
                       ),
                     ),
@@ -109,7 +248,8 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color.fromARGB(255, 54, 116, 165),
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
         onPressed: () {
           Navigator.push(
             context,

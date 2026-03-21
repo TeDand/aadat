@@ -2,6 +2,7 @@ import '../repositories/habit_model.dart';
 
 class HabitService {
   List<Habit> _habits = [];
+  int _nextId = 1;
 
   List<Habit> get habits => List.unmodifiable(_habits);
 
@@ -18,7 +19,11 @@ class HabitService {
       return "habit already exists!";
     }
 
-    _habits.insert(0, inputHabit);
+    var habitToInsert = inputHabit;
+    if (habitToInsert.id == null) {
+      habitToInsert = habitToInsert.copy(id: _nextId++);
+    }
+    _habits.insert(0, habitToInsert);
     return "habit added!";
   }
 
@@ -31,7 +36,9 @@ class HabitService {
     if (updatedHabit.title.isEmpty) return "habit cannot be empty";
 
     if (_habits.any(
-      (h) => h.title.toLowerCase() == updatedHabit.title.toLowerCase(),
+      (h) =>
+          h.id != updatedHabit.id &&
+          h.title.toLowerCase() == updatedHabit.title.toLowerCase(),
     )) {
       return "habit already exists!";
     }

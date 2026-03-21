@@ -1,7 +1,9 @@
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/home_page.dart';
 import 'package:flutter/material.dart';
+import 'package:aadat/ui/home/widgets/calendar_page.dart';
 import 'package:aadat/ui/home/widgets/habits_page.dart';
+import 'package:aadat/ui/home/widgets/metrics_page.dart';
 import 'package:provider/provider.dart';
 
 void main() {
@@ -21,7 +23,28 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       title: 'aadat',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+          brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          clipBehavior: Clip.antiAlias,
+        ),
+        navigationRailTheme: const NavigationRailThemeData(
+          backgroundColor: Colors.white,
+          elevation: 1,
+          indicatorColor: Color(0xFFEFF6FF),
+        ),
       ),
       home: Router(),
     );
@@ -46,6 +69,10 @@ class _RouterState extends State<Router> {
         page = HomePage();
       case 1:
         page = HabitsPage();
+      case 2:
+        page = CalendarPage();
+      case 3:
+        page = MetricsPage();
       default:
         page = HomePage();
     }
@@ -64,8 +91,16 @@ class _RouterState extends State<Router> {
                       label: Text('Home'),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.favorite),
+                      icon: Icon(Icons.checklist),
                       label: Text('Habits'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.calendar_month),
+                      label: Text('Calendar'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.insights_rounded),
+                      label: Text('Metrics'),
                     ),
                   ],
                   selectedIndex: selectedIndex,
@@ -77,8 +112,8 @@ class _RouterState extends State<Router> {
                 ),
               ),
               Expanded(
-                child: Container(
-                  color: Theme.of(context).colorScheme.primaryContainer,
+                child: ColoredBox(
+                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
                   child: page,
                 ),
               ),
