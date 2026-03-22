@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:sqflite/sqflite.dart';
 
 enum HabitRecurrence { daily, weekly, monthly }
@@ -33,6 +35,26 @@ bool habitAppliesOnDate(Habit habit, DateTime date) {
   if (habit.startDate == null) return true;
   final s = habitDateOnly(habit.startDate!);
   return !d.isBefore(s);
+}
+
+/// Next title `New Habit N` after the highest `N` (or plain `New Habit` treated as 1).
+String suggestNextNewHabitTitle(Iterable<Habit> habits) {
+  var maxN = 0;
+  final exactNew = RegExp(r'^new habit$', caseSensitive: false);
+  final numbered = RegExp(r'^new habit (\d+)$', caseSensitive: false);
+  for (final h in habits) {
+    final t = h.title.trim();
+    if (exactNew.hasMatch(t)) {
+      maxN = max(maxN, 1);
+      continue;
+    }
+    final m = numbered.firstMatch(t);
+    if (m != null) {
+      final n = int.tryParse(m.group(1)!);
+      if (n != null) maxN = max(maxN, n);
+    }
+  }
+  return 'New Habit ${maxN + 1}';
 }
 
 class Habit {

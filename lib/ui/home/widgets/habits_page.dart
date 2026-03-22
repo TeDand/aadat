@@ -1,7 +1,7 @@
-import 'package:aadat/data/repositories/habit_model.dart';
-import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/habits_list_view.dart';
+import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 class HabitsPage extends StatelessWidget {
@@ -9,8 +9,6 @@ class HabitsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = context.watch<HomeViewModel>();
-
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -22,7 +20,11 @@ class HabitsPage extends StatelessWidget {
       body: const HabitsListView(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          viewModel.addHabit(Habit(title: 'New Habit', description: ''));
+          final settings = context.read<SettingsViewModel>();
+          if (settings.useHaptics) {
+            HapticFeedback.lightImpact();
+          }
+          showAddHabitSheet(context);
         },
         child: const Icon(Icons.add),
       ),

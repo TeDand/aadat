@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
+import 'package:aadat/ui/settings/settings_dialog.dart';
+import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'habits_page.dart';
 import 'package:aadat/data/repositories/habit_model.dart';
 
@@ -32,7 +35,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void _addHabit(HomeViewModel viewModel) {
+  Future<void> _addHabit(HomeViewModel viewModel) async {
     if (_titleController.text.trim().isEmpty) return;
     final newHabit = Habit(
       title: _titleController.text.trim(),
@@ -41,7 +44,13 @@ class _HomePageState extends State<HomePage> {
       recurrence: _recurrence,
       startDate: _startDate,
     );
-    viewModel.addHabit(newHabit);
+    final r = await viewModel.addHabit(newHabit);
+    if (!mounted) return;
+    if (r == 'habit already exists!') {
+      await showDuplicateHabitNameDialog(context);
+      return;
+    }
+    if (r != 'habit added!') return;
     _titleController.clear();
     _descController.clear();
     _categoryController.clear();
@@ -49,6 +58,32 @@ class _HomePageState extends State<HomePage> {
       _recurrence = HabitRecurrence.daily;
       _startDate = null;
     });
+  }
+
+  Future<void> _onDeleteHabit(Habit habit, HomeViewModel viewModel) async {
+    final confirm = context.read<SettingsViewModel>().confirmBeforeDelete;
+    if (confirm) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete habit?'),
+          content: Text('Remove “${habit.title}” and its tracking data?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (go != true || !mounted) return;
+    }
+    if (!mounted) return;
+    viewModel.deleteHabit(habit);
   }
 
   @override
@@ -60,7 +95,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text('Aadat'),
+        title: _AadatWordmark(foreground: scheme.onPrimary),
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
       ),
@@ -237,7 +272,7 @@ class _HomePageState extends State<HomePage> {
                           habit.startDate != null,
                       trailing: IconButton(
                         icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
-                        onPressed: () => viewModel.deleteHabit(habit),
+                        onPressed: () => _onDeleteHabit(habit, viewModel),
                       ),
                     ),
                   );
@@ -263,6 +298,39 @@ class _HomePageState extends State<HomePage> {
         },
         icon: const Icon(Icons.list),
         label: const Text("View All Habits"),
+      ),
+    );
+  }
+}
+
+/// Stylized logotype for the home app bar.
+class _AadatWordmark extends StatelessWidget {
+  const _AadatWordmark({required this.foreground});
+
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlight = Color.lerp(foreground, const Color(0xFFFFE082), 0.4)!;
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          foreground,
+          highlight,
+        ],
+      ).createShader(bounds),
+      child: Text(
+        'aadat',
+        style: GoogleFonts.syne(
+          fontSize: 26,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 4,
+          height: 1,
+          color: Colors.white,
+        ),
       ),
     );
   }

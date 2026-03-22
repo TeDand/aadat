@@ -88,6 +88,88 @@ class HomeViewModel extends ChangeNotifier {
     return (completed: completed, total: total);
   }
 
+  /// Like [completionSummaryForDay] but only habits with [recurrence].
+  ({int completed, int total}) completionSummaryForDayForRecurrence(
+    DateTime date,
+    HabitRecurrence recurrence,
+  ) {
+    if (_isFutureCalendarDay(date)) return (completed: 0, total: 0);
+    final withIds = _habits
+        .where((h) => h.id != null && h.recurrence == recurrence)
+        .cast<Habit>()
+        .toList();
+    if (withIds.isEmpty) return (completed: 0, total: 0);
+    final d = habitDateOnly(date);
+    final total = _completions.activeHabitsCountOnDate(d, withIds);
+    final completed = _completions.completedCountForDay(
+      d,
+      withIds,
+      weekStartsOnMonday: _weekStartsOnMonday,
+    );
+    return (completed: completed, total: total);
+  }
+
+  /// Weekly habits: total / completed for the week containing [date] (any day in that week).
+  ({int completed, int total}) weeklySummaryForWeekContaining(DateTime date) {
+    final d = habitDateOnly(date);
+    if (d.isAfter(habitDateOnly(DateTime.now()))) {
+      return (completed: 0, total: 0);
+    }
+    final ws = weekStartForDate(d, weekStartsOnMonday: _weekStartsOnMonday);
+    final we = ws.add(const Duration(days: 6));
+    final today = habitDateOnly(DateTime.now());
+    final habits = _habits
+        .where((h) => h.id != null && h.recurrence == HabitRecurrence.weekly)
+        .cast<Habit>()
+        .toList();
+    var total = 0;
+    var completed = 0;
+    for (final h in habits) {
+      var hasTrackable = false;
+      for (var x = ws; !x.isAfter(we); x = x.add(const Duration(days: 1))) {
+        if (x.isAfter(today)) break;
+        if (habitAppliesOnDate(h, x)) {
+          hasTrackable = true;
+          break;
+        }
+      }
+      if (!hasTrackable) continue;
+      total++;
+      if (isHabitCompletedOn(h, ws)) completed++;
+    }
+    return (completed: completed, total: total);
+  }
+
+  /// Monthly habits: total / completed for [year]-[month].
+  ({int completed, int total}) monthlySummaryForMonth(int year, int month) {
+    final today = habitDateOnly(DateTime.now());
+    final first = DateTime(year, month);
+    if (first.isAfter(today)) return (completed: 0, total: 0);
+    final lastDay = DateTime(year, month + 1, 0).day;
+    final habits = _habits
+        .where((h) => h.id != null && h.recurrence == HabitRecurrence.monthly)
+        .cast<Habit>()
+        .toList();
+    var total = 0;
+    var completed = 0;
+    final probe = DateTime(year, month, 1);
+    for (final h in habits) {
+      var hasTrackable = false;
+      for (var day = 1; day <= lastDay; day++) {
+        final x = DateTime(year, month, day);
+        if (x.isAfter(today)) break;
+        if (habitAppliesOnDate(h, x)) {
+          hasTrackable = true;
+          break;
+        }
+      }
+      if (!hasTrackable) continue;
+      total++;
+      if (isHabitCompletedOn(h, probe)) completed++;
+    }
+    return (completed: completed, total: total);
+  }
+
   void toggleHabitCompletion(Habit habit, DateTime date) {
     if (habit.id == null) return;
     if (_isFutureCalendarDay(date)) return;
@@ -109,12 +191,17 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addHabit(Habit habit) async {
+  /// Returns the service message (e.g. `habit added!`, `habit already exists!`).
+  Future<String> addHabit(Habit habit) async {
     final withCat = habit.copy(category: _canonicalCategory(habit.category));
     final result = await _habitService.addHabit(withCat);
-    _setMessage(result);
-
+    if (result == 'habit added!') {
+      _setMessage(result);
+    } else if (result != 'habit already exists!') {
+      _setMessage(result);
+    }
     await fetchHabits();
+    return result;
   }
 
   Future<void> deleteHabit(Habit habit) async {
@@ -128,14 +215,18 @@ class HomeViewModel extends ChangeNotifier {
     await fetchHabits();
   }
 
-  Future<void> updateHabit(Habit habit) async {
+  Future<String> updateHabit(Habit habit) async {
     final withCat = habit.copy(
       category: _canonicalCategory(habit.category, excludeHabitId: habit.id),
     );
     final result = await _habitService.updateHabit(withCat);
-    _setMessage(result);
-
+    if (result == 'habit updated!') {
+      _setMessage(result);
+    } else if (result != 'habit already exists!') {
+      _setMessage(result);
+    }
     await fetchHabits();
+    return result;
   }
 
   void _setMessage(String msg) {

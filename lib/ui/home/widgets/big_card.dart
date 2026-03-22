@@ -1,5 +1,6 @@
 import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
+import 'package:aadat/ui/settings/settings_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -33,8 +34,14 @@ class _BigCardState extends State<BigCard> {
           TextField(
             controller: _controller,
             focusNode: _focusNode,
-            onSubmitted: (inputText) {
-              homeViewModel.addHabit(Habit(title: inputText, description: ''));
+            onSubmitted: (inputText) async {
+              final r = await homeViewModel.addHabit(
+                Habit(title: inputText, description: ''),
+              );
+              if (!context.mounted) return;
+              if (r == 'habit already exists!') {
+                await showDuplicateHabitNameDialog(context);
+              }
               _controller.clear();
               _focusNode.requestFocus();
             },

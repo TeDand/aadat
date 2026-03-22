@@ -4,9 +4,13 @@ import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-/// Progress overview: streaks, averages, 7-day trend, breakdowns.
+/// Progress overview with separate metrics for daily, weekly, and monthly habits.
 class MetricsPage extends StatelessWidget {
   const MetricsPage({super.key});
+
+  static const _dailyAccent = Color(0xFFEA580C);
+  static const _weeklyAccent = Color(0xFF2563EB);
+  static const _monthlyAccent = Color(0xFF059669);
 
   @override
   Widget build(BuildContext context) {
@@ -15,157 +19,296 @@ class MetricsPage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      backgroundColor: scheme.surfaceContainerLowest,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(
-            floating: true,
-            pinned: true,
-            expandedHeight: 120,
-            backgroundColor: scheme.surfaceContainerLowest,
-            surfaceTintColor: Colors.transparent,
-            title: Text(
-              'Metrics',
-              style: textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: scheme.surfaceContainerLowest,
+        appBar: AppBar(
+          title: Text(
+            'Metrics',
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.3,
             ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      scheme.primaryContainer.withValues(alpha: 0.45),
-                      scheme.surfaceContainerLowest,
-                    ],
+          ),
+          backgroundColor: scheme.surfaceContainerLowest,
+          foregroundColor: scheme.onSurface,
+          elevation: 0,
+          scrolledUnderElevation: 0.5,
+          bottom: TabBar(
+            indicatorColor: scheme.primary,
+            labelColor: scheme.primary,
+            unselectedLabelColor: scheme.onSurfaceVariant,
+            tabs: const [
+              Tab(icon: Icon(Icons.wb_sunny_rounded, size: 20), text: 'Daily'),
+              Tab(
+                icon: Icon(Icons.date_range_rounded, size: 20),
+                text: 'Weekly',
+              ),
+              Tab(
+                icon: Icon(Icons.calendar_month_rounded, size: 20),
+                text: 'Monthly',
+              ),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _MetricsTabBody(
+              metrics: m.daily,
+              accent: _dailyAccent,
+              scheme: scheme,
+              textTheme: textTheme,
+              empty: m.totalHabits == 0,
+              tabHint:
+                  'Counts only daily habits. Averages and the chart use the same scope.',
+            ),
+            _MetricsTabBody(
+              metrics: m.weekly,
+              accent: _weeklyAccent,
+              scheme: scheme,
+              textTheme: textTheme,
+              empty: m.totalHabits == 0,
+              tabHint:
+                  'Counts only weekly habits. Averages and the chart use the same scope.',
+            ),
+            _MetricsTabBody(
+              metrics: m.monthly,
+              accent: _monthlyAccent,
+              scheme: scheme,
+              textTheme: textTheme,
+              empty: m.totalHabits == 0,
+              tabHint:
+                  'Counts only monthly habits. Averages and the chart use the same scope.',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricsTabBody extends StatelessWidget {
+  const _MetricsTabBody({
+    required this.metrics,
+    required this.accent,
+    required this.scheme,
+    required this.textTheme,
+    required this.empty,
+    required this.tabHint,
+  });
+
+  final RecurrenceMetrics metrics;
+  final Color accent;
+  final ColorScheme scheme;
+  final TextTheme textTheme;
+  final bool empty;
+  final String tabHint;
+
+  @override
+  Widget build(BuildContext context) {
+    if (empty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        children: [
+          _EmptyMetrics(scheme: scheme, textTheme: textTheme),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      children: [
+        Text(
+          tabHint,
+          style: textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _RecurrenceSection(
+          metrics: metrics,
+          accent: accent,
+          scheme: scheme,
+          textTheme: textTheme,
+        ),
+      ],
+    );
+  }
+}
+
+class _RecurrenceSection extends StatelessWidget {
+  const _RecurrenceSection({
+    required this.metrics,
+    required this.accent,
+    required this.scheme,
+    required this.textTheme,
+  });
+
+  final RecurrenceMetrics metrics;
+  final Color accent;
+  final ColorScheme scheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = metrics.recurrence;
+    final title = '${r.displayName} habits';
+    final empty = metrics.habitCount == 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_iconFor(r), color: accent, size: 26),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-            ),
+              Chip(
+                label: Text('${metrics.habitCount}'),
+                visualDensity: VisualDensity.compact,
+                backgroundColor: accent.withValues(alpha: 0.12),
+                side: BorderSide.none,
+                labelStyle: textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                if (m.totalHabits == 0)
-                  _EmptyMetrics(scheme: scheme, textTheme: textTheme)
-                else ...[
-                  Text(
-                    'Overview',
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurfaceVariant,
-                    ),
+          const SizedBox(height: 14),
+          if (empty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Text(
+                  'No ${r.displayName.toLowerCase()} habits yet. Add one on the Home tab to see stats here.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    height: 1.4,
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.local_fire_department_rounded,
-                          iconColor: const Color(0xFFEA580C),
-                          label: 'Perfect-day streak',
-                          value: '${m.perfectDayStreak}',
-                          subtitle: 'days in a row',
-                          scheme: scheme,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.percent_rounded,
-                          iconColor: scheme.primary,
-                          label: '7-day average',
-                          value: m.avgCompletionLast7DaysPercent != null
-                              ? '${m.avgCompletionLast7DaysPercent!.round()}%'
-                              : '—',
-                          subtitle: 'completion',
-                          scheme: scheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.calendar_month_rounded,
-                          iconColor: const Color(0xFF059669),
-                          label: '30-day average',
-                          value: m.avgCompletionLast30DaysPercent != null
-                              ? '${m.avgCompletionLast30DaysPercent!.round()}%'
-                              : '—',
-                          subtitle: 'completion',
-                          scheme: scheme,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(
-                          icon: Icons.emoji_events_rounded,
-                          iconColor: const Color(0xFF7C3AED),
-                          label: 'Perfect days',
-                          value: m.daysWithHabitsLast30 > 0
-                              ? '${m.perfectDaysLast30}/${m.daysWithHabitsLast30}'
-                              : '—',
-                          subtitle: 'last 30 days',
-                          scheme: scheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _TodayCard(m: m, scheme: scheme, textTheme: textTheme),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Last 7 days',
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _WeekBars(
-                    percents: m.last7DayPercents,
-                    labels: m.last7DayLabels,
+                ),
+              ),
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.local_fire_department_rounded,
+                    iconColor: accent,
+                    label: 'Streak',
+                    value: '${metrics.streak}',
+                    subtitle: _streakUnit(r),
                     scheme: scheme,
                   ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Your habits',
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurfaceVariant,
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.percent_rounded,
+                    iconColor: accent,
+                    label: metrics.avgShortCaption,
+                    value: metrics.avgShortPercent != null
+                        ? '${metrics.avgShortPercent!.round()}%'
+                        : '—',
+                    subtitle: 'completion',
+                    scheme: scheme,
                   ),
-                  const SizedBox(height: 12),
-                  _BreakdownCard(
-                    title: 'By category',
-                    child: _CategoryBars(
-                      data: m.habitsByCategory,
-                      scheme: scheme,
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.insights_rounded,
+                    iconColor: accent,
+                    label: metrics.avgLongCaption,
+                    value: metrics.avgLongPercent != null
+                        ? '${metrics.avgLongPercent!.round()}%'
+                        : '—',
+                    subtitle: 'completion',
+                    scheme: scheme,
                   ),
-                  const SizedBox(height: 12),
-                  _BreakdownCard(
-                    title: 'By recurrence',
-                    child: _RecurrenceRow(
-                      data: m.habitsByRecurrence,
-                      scheme: scheme,
-                    ),
-                  ),
-                ],
-              ]),
+                ),
+              ],
             ),
-          ),
+            const SizedBox(height: 10),
+            _StatCard(
+              icon: Icons.emoji_events_rounded,
+              iconColor: accent,
+              label: metrics.perfectWindowCaption,
+              value: metrics.applicableCount > 0
+                  ? '${metrics.perfectCount}/${metrics.applicableCount}'
+                  : '—',
+              subtitle: 'perfect / had habits',
+              scheme: scheme,
+            ),
+            const SizedBox(height: 14),
+            _PeriodProgressCard(
+              metrics: metrics,
+              accent: accent,
+              scheme: scheme,
+              textTheme: textTheme,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              metrics.trendTitle,
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _TrendBars(
+              percents: metrics.trendPercents,
+              labels: metrics.trendLabels,
+              scheme: scheme,
+              accent: accent,
+            ),
+            const SizedBox(height: 16),
+            _BreakdownCard(
+              title: 'Categories (${r.displayName.toLowerCase()} only)',
+              child: _CategoryBars(
+                data: metrics.habitsByCategory,
+                scheme: scheme,
+                accent: accent,
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  IconData _iconFor(HabitRecurrence r) {
+    switch (r) {
+      case HabitRecurrence.daily:
+        return Icons.wb_sunny_rounded;
+      case HabitRecurrence.weekly:
+        return Icons.date_range_rounded;
+      case HabitRecurrence.monthly:
+        return Icons.calendar_month_rounded;
+    }
+  }
+}
+
+String _streakUnit(HabitRecurrence r) {
+  switch (r) {
+    case HabitRecurrence.daily:
+      return 'days';
+    case HabitRecurrence.weekly:
+      return 'weeks';
+    case HabitRecurrence.monthly:
+      return 'months';
   }
 }
 
@@ -196,7 +339,7 @@ class _EmptyMetrics extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Add habits on Home and log them on the calendar\nto see streaks and trends here.',
+            'Add habits on Home and log them on the calendar\nto see per-recurrence metrics here.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
@@ -231,23 +374,26 @@ class _StatCard extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: iconColor, size: 26),
-            const SizedBox(height: 12),
+            Icon(icon, color: iconColor, size: 24),
+            const SizedBox(height: 10),
             Text(
               label,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: t.labelMedium?.copyWith(
                 color: scheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
+                fontSize: 11,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               value,
-              style: t.headlineSmall?.copyWith(
+              style: t.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.5,
               ),
@@ -263,21 +409,23 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _TodayCard extends StatelessWidget {
-  const _TodayCard({
-    required this.m,
+class _PeriodProgressCard extends StatelessWidget {
+  const _PeriodProgressCard({
+    required this.metrics,
+    required this.accent,
     required this.scheme,
     required this.textTheme,
   });
 
-  final HabitMetrics m;
+  final RecurrenceMetrics metrics;
+  final Color accent;
   final ColorScheme scheme;
   final TextTheme textTheme;
 
   @override
   Widget build(BuildContext context) {
-    final total = m.todayTotal;
-    final done = m.todayCompleted;
+    final total = metrics.periodTotal;
+    final done = metrics.periodCompleted;
     final frac = total == 0 ? 0.0 : done / total;
 
     return Card(
@@ -288,20 +436,27 @@ class _TodayCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.today_rounded, color: scheme.primary),
+                Icon(Icons.flag_rounded, color: accent),
                 const SizedBox(width: 8),
                 Text(
-                  'Today',
+                  metrics.periodTitle,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+            Text(
+              metrics.periodSubtitle,
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
             if (total == 0)
               Text(
-                'No habits apply today (check start dates).',
+                'No habits in this period (check start dates).',
                 style: textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -313,7 +468,7 @@ class _TodayCard extends StatelessWidget {
                   value: frac,
                   minHeight: 10,
                   backgroundColor: scheme.surfaceContainerHighest,
-                  color: scheme.primary,
+                  color: accent,
                 ),
               ),
               const SizedBox(height: 12),
@@ -332,23 +487,25 @@ class _TodayCard extends StatelessWidget {
   }
 }
 
-class _WeekBars extends StatelessWidget {
-  const _WeekBars({
+class _TrendBars extends StatelessWidget {
+  const _TrendBars({
     required this.percents,
     required this.labels,
     required this.scheme,
+    required this.accent,
   });
 
   final List<int> percents;
   final List<String> labels;
   final ColorScheme scheme;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+        padding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
         child: SizedBox(
           height: 148,
           child: Row(
@@ -357,7 +514,7 @@ class _WeekBars extends StatelessWidget {
               for (var i = 0; i < percents.length; i++)
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Column(
                       children: [
                         Text(
@@ -365,6 +522,7 @@ class _WeekBars extends StatelessWidget {
                           style: t.labelSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: scheme.onSurfaceVariant,
+                            fontSize: 10,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -387,8 +545,8 @@ class _WeekBars extends StatelessWidget {
                                       begin: Alignment.bottomCenter,
                                       end: Alignment.topCenter,
                                       colors: [
-                                        scheme.primary.withValues(alpha: 0.35),
-                                        scheme.primary,
+                                        accent.withValues(alpha: 0.35),
+                                        accent,
                                       ],
                                     ),
                                   ),
@@ -402,7 +560,7 @@ class _WeekBars extends StatelessWidget {
                           labels[i],
                           style: t.labelSmall?.copyWith(
                             color: scheme.outline,
-                            fontSize: 10,
+                            fontSize: 9,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -458,17 +616,19 @@ class _CategoryBars extends StatelessWidget {
   const _CategoryBars({
     required this.data,
     required this.scheme,
+    required this.accent,
   });
 
   final Map<String, int> data;
   final ColorScheme scheme;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final total = data.values.fold<int>(0, (a, b) => a + b);
     if (total == 0) {
       return Text(
-        '—',
+        'No categories',
         style: Theme.of(context).textTheme.bodyMedium,
       );
     }
@@ -496,7 +656,7 @@ class _CategoryBars extends StatelessWidget {
                     Text(
                       '${e.value}',
                       style: TextStyle(
-                        color: scheme.primary,
+                        color: accent,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -509,7 +669,7 @@ class _CategoryBars extends StatelessWidget {
                     value: e.value / total,
                     minHeight: 6,
                     backgroundColor: scheme.surfaceContainerHighest,
-                    color: scheme.secondary,
+                    color: accent.withValues(alpha: 0.85),
                   ),
                 ),
               ],
@@ -517,49 +677,5 @@ class _CategoryBars extends StatelessWidget {
           ),
       ],
     );
-  }
-}
-
-class _RecurrenceRow extends StatelessWidget {
-  const _RecurrenceRow({
-    required this.data,
-    required this.scheme,
-  });
-
-  final Map<HabitRecurrence, int> data;
-  final ColorScheme scheme;
-
-  @override
-  Widget build(BuildContext context) {
-    final order = HabitRecurrence.values;
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final r in order)
-          if ((data[r] ?? 0) > 0)
-            Chip(
-              avatar: Icon(
-                _iconFor(r),
-                size: 18,
-                color: scheme.primary,
-              ),
-              label: Text('${r.displayName} · ${data[r]}'),
-              backgroundColor: scheme.primaryContainer.withValues(alpha: 0.4),
-              side: BorderSide.none,
-            ),
-      ],
-    );
-  }
-
-  IconData _iconFor(HabitRecurrence r) {
-    switch (r) {
-      case HabitRecurrence.daily:
-        return Icons.today;
-      case HabitRecurrence.weekly:
-        return Icons.date_range;
-      case HabitRecurrence.monthly:
-        return Icons.calendar_month;
-    }
   }
 }

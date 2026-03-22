@@ -1,7 +1,35 @@
 import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
+import 'package:aadat/ui/settings/settings_dialog.dart';
+import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+/// Opens the same editor as habit details, for creating a habit with a suggested title.
+void showAddHabitSheet(BuildContext context) {
+  final homeViewModel = context.read<HomeViewModel>();
+  final settings = context.read<SettingsViewModel>();
+  final title = suggestNextNewHabitTitle(homeViewModel.habits);
+  final draft = Habit(
+    title: title,
+    description: '',
+    recurrence: settings.defaultHabitRecurrence,
+  );
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (BuildContext context) {
+      return _HabitEditorSheet(
+        habit: draft,
+        isNew: true,
+        onCommit: (updated) => homeViewModel.addHabit(updated),
+      );
+    },
+  );
+}
 
 enum HabitsGroupBy {
   recurrence,
@@ -29,10 +57,8 @@ class _HabitsListViewState extends State<HabitsListView> {
       builder: (BuildContext context) {
         return _HabitEditorSheet(
           habit: habit,
-          onSave: (updated) {
-            homeViewModel.updateHabit(updated);
-            Navigator.of(context).pop();
-          },
+          isNew: false,
+          onCommit: (updated) => homeViewModel.updateHabit(updated),
         );
       },
     );
@@ -244,11 +270,13 @@ class _HabitsListViewState extends State<HabitsListView> {
 class _HabitEditorSheet extends StatefulWidget {
   const _HabitEditorSheet({
     required this.habit,
-    required this.onSave,
+    required this.isNew,
+    required this.onCommit,
   });
 
   final Habit habit;
-  final void Function(Habit updated) onSave;
+  final bool isNew;
+  final Future<String> Function(Habit updated) onCommit;
 
   @override
   State<_HabitEditorSheet> createState() => _HabitEditorSheetState();
@@ -303,7 +331,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Edit Habit',
+              widget.isNew ? 'Add habit' : 'Edit habit',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
@@ -438,7 +466,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final updated = widget.habit.copy(
                       title: _titleController.text,
                       description: _descriptionController.text,
@@ -447,9 +475,15 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
                       startDate: _startDate,
                       clearStartDate: _startDate == null,
                     );
-                    widget.onSave(updated);
+                    final r = await widget.onCommit(updated);
+                    if (!context.mounted) return;
+                    if (r == 'habit added!' || r == 'habit updated!') {
+                      Navigator.of(context).pop();
+                    } else if (r == 'habit already exists!') {
+                      await showDuplicateHabitNameDialog(context);
+                    }
                   },
-                  child: const Text('Save'),
+                  child: Text(widget.isNew ? 'Add' : 'Save'),
                 ),
               ],
             ),
