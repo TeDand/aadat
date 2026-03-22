@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_dialog.dart';
-import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'habits_page.dart';
 import 'package:aadat/data/repositories/habit_model.dart';
 
@@ -60,31 +59,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _onDeleteHabit(Habit habit, HomeViewModel viewModel) async {
-    final confirm = context.read<SettingsViewModel>().confirmBeforeDelete;
-    if (confirm) {
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Delete habit?'),
-          content: Text('Remove “${habit.title}” and its tracking data?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
-      );
-      if (go != true || !mounted) return;
-    }
-    if (!mounted) return;
-    viewModel.deleteHabit(habit);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,11 +73,14 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (viewModel.urgentHabits.isNotEmpty)
+              _UrgencyBanner(urgent: viewModel.urgentHabits),
+            if (viewModel.urgentHabits.isNotEmpty) const SizedBox(height: 16),
             TextField(
               controller: _titleController,
               focusNode: _titleFocus,
@@ -242,43 +219,6 @@ class _HomePageState extends State<HomePage> {
               onPressed: () => _addHabit(viewModel),
               child: const Text('Add Habit'),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Your habits',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                itemCount: viewModel.habits.length,
-                itemBuilder: (context, index) {
-                  final habit = viewModel.habits[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    child: ListTile(
-                      title: Text(habit.title),
-                      subtitle: Text(
-                        [
-                          if (habit.description.isNotEmpty) habit.description,
-                          '${habit.recurrence.displayName}'
-                              '${habit.category.isNotEmpty ? ' · ${habit.category}' : ''}',
-                          if (habit.startDate != null)
-                            'Starts ${habit.startDate!.year}-${habit.startDate!.month.toString().padLeft(2, '0')}-${habit.startDate!.day.toString().padLeft(2, '0')}',
-                        ].join('\n'),
-                      ),
-                      isThreeLine: habit.description.isNotEmpty ||
-                          habit.startDate != null,
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
-                        onPressed: () => _onDeleteHabit(habit, viewModel),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
           ],
         ),
       ),
@@ -298,6 +238,51 @@ class _HomePageState extends State<HomePage> {
         },
         icon: const Icon(Icons.list),
         label: const Text("View All Habits"),
+      ),
+    );
+  }
+}
+
+class _UrgencyBanner extends StatelessWidget {
+  const _UrgencyBanner({required this.urgent});
+
+  final List<({Habit habit, String reason})> urgent;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: Colors.orange.shade700, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'Approaching deadlines',
+                style: textTheme.titleSmall?.copyWith(
+                  color: Colors.orange.shade900,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final u in urgent)
+            Text(
+              '• ${u.habit.title} — ${u.reason}',
+              style: textTheme.bodySmall
+                  ?.copyWith(color: Colors.orange.shade900),
+            ),
+        ],
       ),
     );
   }
