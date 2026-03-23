@@ -52,15 +52,15 @@ class HabitCompletionService {
       return false;
     }
 
-    switch (habit.recurrence) {
-      case HabitRecurrence.daily:
-        return _keys.contains('d|$id|${_dateKey(d)}');
-      case HabitRecurrence.weekly:
-        final ws = weekStartForDate(d, weekStartsOnMonday: weekStartsOnMonday);
-        return _keys.contains('w|$id|${_dateKey(ws)}');
-      case HabitRecurrence.monthly:
-        return _keys.contains('m|$id|${_monthPayload(d.year, d.month)}');
-    }
+    // Check all three key types so that changing a habit's recurrence does not
+    // erase completions recorded under the previous recurrence type.
+    // toggle() still writes under the *current* recurrence, so new entries are
+    // always stored correctly; old entries are simply still recognised here.
+    if (_keys.contains('d|$id|${_dateKey(d)}')) return true;
+    final ws = weekStartForDate(d, weekStartsOnMonday: weekStartsOnMonday);
+    if (_keys.contains('w|$id|${_dateKey(ws)}')) return true;
+    if (_keys.contains('m|$id|${_monthPayload(d.year, d.month)}')) return true;
+    return false;
   }
 
   /// Toggle completion for [habit] on [date]. Weekly/monthly flip a whole week/month.

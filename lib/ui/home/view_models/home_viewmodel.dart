@@ -170,6 +170,180 @@ class HomeViewModel extends ChangeNotifier {
     return (completed: completed, total: total);
   }
 
+  /// Current and best streak for a single habit (in its natural period unit).
+  ({int current, int best}) streaksForHabit(Habit habit) {
+    if (habit.id == null) return (current: 0, best: 0);
+    final today = habitDateOnly(DateTime.now());
+    if (habit.recurrence == HabitRecurrence.daily) {
+      return _dailyStreaksForHabit(habit, today);
+    } else if (habit.recurrence == HabitRecurrence.weekly) {
+      return _weeklyStreaksForHabit(habit, today);
+    } else {
+      return _monthlyStreaksForHabit(habit, today);
+    }
+  }
+
+  ({int current, int best}) _dailyStreaksForHabit(Habit habit, DateTime today) {
+    var current = 0;
+    var best = 0;
+    var run = 0;
+    var inCurrent = true;
+    for (var i = 0; i < 500; i++) {
+      final d = today.subtract(Duration(days: i));
+      if (!habitAppliesOnDate(habit, d)) break;
+      if (isHabitCompletedOn(habit, d)) {
+        run++;
+        if (inCurrent) current++;
+      } else {
+        if (inCurrent) inCurrent = false;
+        if (run > best) best = run;
+        run = 0;
+      }
+    }
+    if (run > best) best = run;
+    return (current: current, best: best);
+  }
+
+  ({int current, int best}) _weeklyStreaksForHabit(Habit habit, DateTime today) {
+    var ws = weekStartForDate(today, weekStartsOnMonday: _weekStartsOnMonday);
+    var current = 0;
+    var best = 0;
+    var run = 0;
+    var inCurrent = true;
+    for (var i = 0; i < 200; i++) {
+      final we = ws.add(const Duration(days: 6));
+      var applies = false;
+      for (
+        var x = ws;
+        !x.isAfter(we) && !x.isAfter(today);
+        x = x.add(const Duration(days: 1))
+      ) {
+        if (habitAppliesOnDate(habit, x)) {
+          applies = true;
+          break;
+        }
+      }
+      if (!applies) break;
+      if (isHabitCompletedOn(habit, ws)) {
+        run++;
+        if (inCurrent) current++;
+      } else {
+        if (inCurrent) inCurrent = false;
+        if (run > best) best = run;
+        run = 0;
+      }
+      ws = ws.subtract(const Duration(days: 7));
+    }
+    if (run > best) best = run;
+    return (current: current, best: best);
+  }
+
+  ({int current, int best}) _monthlyStreaksForHabit(Habit habit, DateTime today) {
+    var y = today.year;
+    var m = today.month;
+    var current = 0;
+    var best = 0;
+    var run = 0;
+    var inCurrent = true;
+    for (var i = 0; i < 120; i++) {
+      final probe = DateTime(y, m, 1);
+      if (!habitAppliesOnDate(habit, probe)) break;
+      if (isHabitCompletedOn(habit, probe)) {
+        run++;
+        if (inCurrent) current++;
+      } else {
+        if (inCurrent) inCurrent = false;
+        if (run > best) best = run;
+        run = 0;
+      }
+      if (m == 1) {
+        m = 12;
+        y--;
+      } else {
+        m--;
+      }
+    }
+    if (run > best) best = run;
+    return (current: current, best: best);
+  }
+
+  /// Completion rate 0.0–1.0 over recent periods, or null if no applicable periods.
+  double? completionRateForHabit(Habit habit) {
+    if (habit.id == null) return null;
+    final today = habitDateOnly(DateTime.now());
+    var done = 0;
+    var total = 0;
+    if (habit.recurrence == HabitRecurrence.daily) {
+      for (var i = 0; i < 30; i++) {
+        final d = today.subtract(Duration(days: i));
+        if (!habitAppliesOnDate(habit, d)) continue;
+        total++;
+        if (isHabitCompletedOn(habit, d)) done++;
+      }
+    } else if (habit.recurrence == HabitRecurrence.weekly) {
+      var ws = weekStartForDate(today, weekStartsOnMonday: _weekStartsOnMonday);
+      for (var i = 0; i < 8; i++) {
+        final we = ws.add(const Duration(days: 6));
+        var applies = false;
+        for (
+          var x = ws;
+          !x.isAfter(we) && !x.isAfter(today);
+          x = x.add(const Duration(days: 1))
+        ) {
+          if (habitAppliesOnDate(habit, x)) {
+            applies = true;
+            break;
+          }
+        }
+        if (applies) {
+          total++;
+          if (isHabitCompletedOn(habit, ws)) done++;
+        }
+        ws = ws.subtract(const Duration(days: 7));
+      }
+    } else {
+      for (var i = 0; i < 6; i++) {
+        final probe = DateTime(today.year, today.month - i, 1);
+        if (!habitAppliesOnDate(habit, probe)) continue;
+        total++;
+        if (isHabitCompletedOn(habit, probe)) done++;
+      }
+    }
+    if (total == 0) return null;
+    return done / total;
+  }
+
+  /// Habits with approaching deadlines that are not yet completed.
+  List<({Habit habit, String reason})> get urgentHabits {
+    final today = habitDateOnly(DateTime.now());
+    final result = <({Habit habit, String reason})>[];
+    for (final h in _habits) {
+      if (h.id == null) continue;
+      if (!habitAppliesOnDate(h, today)) continue;
+      if (h.recurrence == HabitRecurrence.weekly) {
+        final ws = weekStartForDate(today, weekStartsOnMonday: _weekStartsOnMonday);
+        final we = ws.add(const Duration(days: 6));
+        final daysLeft = we.difference(today).inDays;
+        if (daysLeft <= 2 && !isHabitCompletedOn(h, today)) {
+          final label = daysLeft == 0
+              ? 'last day of week'
+              : '$daysLeft day${daysLeft == 1 ? '' : 's'} left in week';
+          result.add((habit: h, reason: 'Weekly — $label'));
+        }
+      } else if (h.recurrence == HabitRecurrence.monthly) {
+        final lastDay = DateTime(today.year, today.month + 1, 0).day;
+        final daysLeft = lastDay - today.day;
+        if (daysLeft <= 2 && !isHabitCompletedOn(h, today)) {
+          final label = daysLeft == 0
+              ? 'last day of month'
+              : '$daysLeft day${daysLeft == 1 ? '' : 's'} left in month';
+          result.add((habit: h, reason: 'Monthly — $label'));
+        }
+      }
+    }
+    return result;
+  }
+
   void toggleHabitCompletion(Habit habit, DateTime date) {
     if (habit.id == null) return;
     if (_isFutureCalendarDay(date)) return;
