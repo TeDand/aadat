@@ -289,6 +289,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
   late final FocusNode _categoryFocus;
   late HabitRecurrence _recurrence;
   DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -300,8 +301,12 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
     _categoryController = TextEditingController(text: widget.habit.category);
     _categoryFocus = FocusNode();
     _recurrence = widget.habit.recurrence;
+    // New habits default to starting today; existing habits keep their stored date.
     _startDate = widget.habit.startDate != null
         ? habitDateOnly(widget.habit.startDate!)
+        : (widget.isNew ? habitDateOnly(DateTime.now()) : null);
+    _endDate = widget.habit.endDate != null
+        ? habitDateOnly(widget.habit.endDate!)
         : null;
   }
 
@@ -424,38 +429,18 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
               ),
             ),
             const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Start date'),
-              subtitle: Text(
-                _startDate == null
-                    ? 'No start date (applies from the beginning)'
-                    : '${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')}',
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_startDate != null)
-                    TextButton(
-                      onPressed: () => setState(() => _startDate = null),
-                      child: const Text('Clear'),
-                    ),
-                  TextButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _startDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() => _startDate = habitDateOnly(picked));
-                      }
-                    },
-                    child: const Text('Set'),
-                  ),
-                ],
-              ),
+            _DatePickerRow(
+              label: 'Start date',
+              date: _startDate,
+              onClear: () => setState(() => _startDate = null),
+              onSet: (d) => setState(() => _startDate = d),
+            ),
+            _DatePickerRow(
+              label: 'End date',
+              hint: 'Optional — habit stops appearing after this day',
+              date: _endDate,
+              onClear: () => setState(() => _endDate = null),
+              onSet: (d) => setState(() => _endDate = d),
             ),
             const SizedBox(height: 24),
             Row(
@@ -474,6 +459,8 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
                       recurrence: _recurrence,
                       startDate: _startDate,
                       clearStartDate: _startDate == null,
+                      endDate: _endDate,
+                      clearEndDate: _endDate == null,
                     );
                     final r = await widget.onCommit(updated);
                     if (!context.mounted) return;
@@ -489,6 +476,58 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DatePickerRow extends StatelessWidget {
+  const _DatePickerRow({
+    required this.label,
+    this.hint,
+    required this.date,
+    required this.onClear,
+    required this.onSet,
+  });
+
+  final String label;
+  final String? hint;
+  final DateTime? date;
+  final VoidCallback onClear;
+  final void Function(DateTime) onSet;
+
+  String get _subtitle {
+    if (date == null) return hint ?? 'Not set';
+    return '${date!.year}-${date!.month.toString().padLeft(2, '0')}-${date!.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: Text(_subtitle),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (date != null)
+            TextButton(
+              onPressed: onClear,
+              child: const Text('Clear'),
+            ),
+          TextButton(
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: date ?? DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) onSet(habitDateOnly(picked));
+            },
+            child: const Text('Set'),
+          ),
+        ],
       ),
     );
   }

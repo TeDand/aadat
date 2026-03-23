@@ -21,7 +21,13 @@ class _HomePageState extends State<HomePage> {
   final _descFocus = FocusNode();
   final _categoryFocus = FocusNode();
   HabitRecurrence _recurrence = HabitRecurrence.daily;
-  DateTime? _startDate;
+  late DateTime _startDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _startDate = habitDateOnly(DateTime.now());
+  }
 
   @override
   void dispose() {
@@ -55,7 +61,7 @@ class _HomePageState extends State<HomePage> {
     _categoryController.clear();
     setState(() {
       _recurrence = HabitRecurrence.daily;
-      _startDate = null;
+      _startDate = habitDateOnly(DateTime.now());
     });
   }
 
@@ -182,33 +188,21 @@ class _HomePageState extends State<HomePage> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Start date'),
               subtitle: Text(
-                _startDate == null
-                    ? 'Optional — habit applies from this day onward'
-                    : '${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')}',
+                '${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}',
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_startDate != null)
-                    TextButton(
-                      onPressed: () => setState(() => _startDate = null),
-                      child: const Text('Clear'),
-                    ),
-                  TextButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _startDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() => _startDate = habitDateOnly(picked));
-                      }
-                    },
-                    child: const Text('Set'),
-                  ),
-                ],
+              trailing: TextButton(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _startDate,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setState(() => _startDate = habitDateOnly(picked));
+                  }
+                },
+                child: const Text('Change'),
               ),
             ),
             const SizedBox(height: 16),

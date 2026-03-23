@@ -64,6 +64,11 @@ class HabitCompletionService {
   }
 
   /// Toggle completion for [habit] on [date]. Weekly/monthly flip a whole week/month.
+  ///
+  /// When the habit is currently completed (via *any* recurrence key type — this
+  /// handles habits whose recurrence was changed after completions were recorded),
+  /// ALL key types for that period are cleared so the habit shows as not-done.
+  /// When not completed, a key is added under the *current* recurrence type only.
   void toggle(
     Habit habit,
     DateTime date, {
@@ -78,38 +83,25 @@ class HabitCompletionService {
     final start = habit.startDate != null ? habitDateOnly(habit.startDate!) : null;
     if (start != null && d.isBefore(start)) return;
 
-    switch (habit.recurrence) {
-      case HabitRecurrence.daily:
-        final k = 'd|$id|${_dateKey(d)}';
-        if (_keys.contains(k)) {
-          _keys.remove(k);
-        } else {
-          _keys.add(k);
-        }
-        return;
-      case HabitRecurrence.weekly:
-        final ws = weekStartForDate(d, weekStartsOnMonday: weekStartsOnMonday);
-        final wk = 'w|$id|${_dateKey(ws)}';
-        if (!_weekHasAnyTrackableDay(ws, today, start)) {
-          return;
-        }
-        if (_keys.contains(wk)) {
-          _keys.remove(wk);
-        } else {
-          _keys.add(wk);
-        }
-        return;
-      case HabitRecurrence.monthly:
-        final mk = 'm|$id|${_monthPayload(d.year, d.month)}';
-        if (!_monthHasAnyTrackableDay(d.year, d.month, today, start)) {
-          return;
-        }
-        if (_keys.contains(mk)) {
-          _keys.remove(mk);
-        } else {
-          _keys.add(mk);
-        }
-        return;
+    final ws = weekStartForDate(d, weekStartsOnMonday: weekStartsOnMonday);
+
+    if (isCompleted(habit, date, weekStartsOnMonday: weekStartsOnMonday)) {
+      // Remove across all types so legacy keys from a previous recurrence are
+      // also cleared, preventing a "stuck completed" state after recurrence change.
+      _keys.remove('d|$id|${_dateKey(d)}');
+      _keys.remove('w|$id|${_dateKey(ws)}');
+      _keys.remove('m|$id|${_monthPayload(d.year, d.month)}');
+    } else {
+      switch (habit.recurrence) {
+        case HabitRecurrence.daily:
+          _keys.add('d|$id|${_dateKey(d)}');
+        case HabitRecurrence.weekly:
+          if (!_weekHasAnyTrackableDay(ws, today, start)) return;
+          _keys.add('w|$id|${_dateKey(ws)}');
+        case HabitRecurrence.monthly:
+          if (!_monthHasAnyTrackableDay(d.year, d.month, today, start)) return;
+          _keys.add('m|$id|${_monthPayload(d.year, d.month)}');
+      }
     }
   }
 
