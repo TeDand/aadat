@@ -13,9 +13,11 @@ class HabitsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text('Your Habits'),
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
+        title: const Text('Habits'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: scheme.outlineVariant),
+        ),
       ),
       body: const HabitsListView(),
       floatingActionButton: FloatingActionButton(

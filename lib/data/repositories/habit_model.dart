@@ -29,12 +29,16 @@ DateTime weekStartForDate(DateTime date, {required bool weekStartsOnMonday}) {
   return d.subtract(Duration(days: daysFromSunday));
 }
 
-/// Whether [habit] is in effect on this calendar [date] (start date rule).
+/// Whether [habit] is in effect on this calendar [date] (start/end date rules).
 bool habitAppliesOnDate(Habit habit, DateTime date) {
   final d = habitDateOnly(date);
-  if (habit.startDate == null) return true;
-  final s = habitDateOnly(habit.startDate!);
-  return !d.isBefore(s);
+  if (habit.startDate != null && d.isBefore(habitDateOnly(habit.startDate!))) {
+    return false;
+  }
+  if (habit.endDate != null && d.isAfter(habitDateOnly(habit.endDate!))) {
+    return false;
+  }
+  return true;
 }
 
 /// Next title `New Habit N` after the highest `N` (or plain `New Habit` treated as 1).
@@ -68,6 +72,8 @@ class Habit {
   HabitRecurrence recurrence;
   /// First day this habit applies (optional). Compared as calendar dates only.
   DateTime? startDate;
+  /// Last day this habit applies (optional). Habit disappears from calendar after this date.
+  DateTime? endDate;
 
   Habit({
     this.id,
@@ -78,6 +84,7 @@ class Habit {
     this.category = '',
     this.recurrence = HabitRecurrence.daily,
     this.startDate,
+    this.endDate,
   });
 
   Habit copy({
@@ -90,6 +97,8 @@ class Habit {
     HabitRecurrence? recurrence,
     DateTime? startDate,
     bool clearStartDate = false,
+    DateTime? endDate,
+    bool clearEndDate = false,
   }) {
     return Habit(
       id: id ?? this.id,
@@ -100,6 +109,7 @@ class Habit {
       category: category ?? this.category,
       recurrence: recurrence ?? this.recurrence,
       startDate: clearStartDate ? null : (startDate ?? this.startDate),
+      endDate: clearEndDate ? null : (endDate ?? this.endDate),
     );
   }
 
@@ -112,6 +122,7 @@ class Habit {
     HabitFields.category: category,
     HabitFields.recurrence: recurrence.name,
     HabitFields.startDate: startDate != null ? _dateKeyForJson(startDate!) : null,
+    HabitFields.endDate: endDate != null ? _dateKeyForJson(endDate!) : null,
   };
 
   factory Habit.fromJson(Map<String, Object?> json) => Habit(
@@ -125,6 +136,7 @@ class Habit {
     category: (json[HabitFields.category] as String?) ?? '',
     recurrence: _parseRecurrence(json[HabitFields.recurrence] as String?),
     startDate: _parseStartDate(json[HabitFields.startDate] as String?),
+    endDate: _parseStartDate(json[HabitFields.endDate] as String?),
   );
 }
 
@@ -161,6 +173,7 @@ class HabitFields {
   static const String category = 'category';
   static const String recurrence = 'recurrence';
   static const String startDate = 'start_date';
+  static const String endDate = 'end_date';
 
   static const List<String> values = [
     id,
@@ -171,6 +184,7 @@ class HabitFields {
     category,
     recurrence,
     startDate,
+    endDate,
   ];
 }
 
@@ -195,7 +209,7 @@ class HabitDatabase {
     final path = '$databasePath/habits.db';
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -218,6 +232,12 @@ class HabitDatabase {
         ADD COLUMN ${HabitFields.startDate} TEXT
       ''');
     }
+    if (oldVersion < 4) {
+      await db.execute('''
+        ALTER TABLE ${HabitFields.tableName}
+        ADD COLUMN ${HabitFields.endDate} TEXT
+      ''');
+    }
   }
 
   Future<void> _createDatabase(Database db, int version) async {
@@ -230,7 +250,8 @@ class HabitDatabase {
           ${HabitFields.createdTime} ${HabitFields.textType},
           ${HabitFields.category} TEXT NOT NULL DEFAULT '',
           ${HabitFields.recurrence} TEXT NOT NULL DEFAULT 'daily',
-          ${HabitFields.startDate} TEXT
+          ${HabitFields.startDate} TEXT,
+          ${HabitFields.endDate} TEXT
         )
       ''');
   }

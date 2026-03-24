@@ -16,6 +16,11 @@ class HomeViewModel extends ChangeNotifier {
   List<Habit> _habits = [];
   bool _weekStartsOnMonday = true;
 
+  // Per-habit recurrence history, sorted ascending by effectiveFrom.
+  // Each entry means "from this date forward, recurrence = X".
+  final Map<int, List<({DateTime effectiveFrom, HabitRecurrence recurrence})>>
+      _recurrenceHistory = {};
+
   List<Habit> get habits => List.unmodifiable(_habits);
   bool get loading => _loading;
   String? get message => _message;
@@ -365,16 +370,74 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Recurrence history ───────────────────────────────────────────────────
+
+  void _recordRecurrence(int id, HabitRecurrence recurrence, DateTime from) {
+    final list = _recurrenceHistory.putIfAbsent(id, () => []);
+    // Avoid duplicate entries for the same date.
+    if (list.isNotEmpty && habitDateOnly(list.last.effectiveFrom) == habitDateOnly(from)) {
+      list.last = (effectiveFrom: habitDateOnly(from), recurrence: recurrence);
+    } else {
+      list.add((effectiveFrom: habitDateOnly(from), recurrence: recurrence));
+    }
+  }
+
+  /// What recurrence did [habit] have on [date]?
+  HabitRecurrence recurrenceForHabitOnDate(Habit habit, DateTime date) {
+    final id = habit.id;
+    if (id == null) return habit.recurrence;
+    final history = _recurrenceHistory[id];
+    if (history == null || history.isEmpty) return habit.recurrence;
+    final d = habitDateOnly(date);
+    HabitRecurrence result = history.first.recurrence;
+    for (final entry in history) {
+      if (!entry.effectiveFrom.isAfter(d)) result = entry.recurrence;
+    }
+    return result;
+  }
+
+  /// Returns the first recurrence change that happened *after* [date], or null.
+  ({DateTime on, HabitRecurrence to})? nextChangeAfterDate(
+    Habit habit,
+    DateTime date,
+  ) {
+    final id = habit.id;
+    if (id == null) return null;
+    final history = _recurrenceHistory[id];
+    if (history == null || history.length <= 1) return null;
+    final d = habitDateOnly(date);
+    for (final entry in history) {
+      if (entry.effectiveFrom.isAfter(d)) {
+        return (on: entry.effectiveFrom, to: entry.recurrence);
+      }
+    }
+    return null;
+  }
+
+  // ── CRUD ─────────────────────────────────────────────────────────────────
+
   /// Returns the service message (e.g. `habit added!`, `habit already exists!`).
   Future<String> addHabit(Habit habit) async {
     final withCat = habit.copy(category: _canonicalCategory(habit.category));
     final result = await _habitService.addHabit(withCat);
     if (result == 'habit added!') {
       _setMessage(result);
+      await fetchHabits();
+      // Record initial recurrence starting from the habit's start date (or today).
+      final added = _habits.firstWhere(
+        (h) => h.title.toLowerCase() == withCat.title.toLowerCase() && h.id != null,
+        orElse: () => withCat,
+      );
+      if (added.id != null) {
+        final since = added.startDate ?? habitDateOnly(DateTime.now());
+        _recordRecurrence(added.id!, added.recurrence, since);
+      }
     } else if (result != 'habit already exists!') {
       _setMessage(result);
+      await fetchHabits();
+    } else {
+      await fetchHabits();
     }
-    await fetchHabits();
     return result;
   }
 
@@ -382,10 +445,10 @@ class HomeViewModel extends ChangeNotifier {
     final id = habit.id;
     if (id != null) {
       _completions.clearForHabit(id);
+      _recurrenceHistory.remove(id);
     }
     final result = await _habitService.deleteHabit(habit);
     _setMessage(result);
-
     await fetchHabits();
   }
 
@@ -393,9 +456,22 @@ class HomeViewModel extends ChangeNotifier {
     final withCat = habit.copy(
       category: _canonicalCategory(habit.category, excludeHabitId: habit.id),
     );
+    // Capture old recurrence before the update.
+    final oldHabit = _habits.firstWhere(
+      (h) => h.id == withCat.id,
+      orElse: () => withCat,
+    );
     final result = await _habitService.updateHabit(withCat);
     if (result == 'habit updated!') {
       _setMessage(result);
+      // If recurrence changed, record the new recurrence starting today.
+      if (withCat.id != null && oldHabit.recurrence != withCat.recurrence) {
+        _recordRecurrence(
+          withCat.id!,
+          withCat.recurrence,
+          habitDateOnly(DateTime.now()),
+        );
+      }
     } else if (result != 'habit already exists!') {
       _setMessage(result);
     }

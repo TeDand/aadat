@@ -1,5 +1,8 @@
+import 'dart:math';
+
 import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
+import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -45,84 +48,101 @@ class _CalendarPageState extends State<CalendarPage> {
     ColorScheme scheme,
   ) {
     final textTheme = Theme.of(context).textTheme;
-    final urgentIds =
-        vm.urgentHabits.map((u) => u.habit.id).whereType<int>().toSet();
-    final allHabits =
-        vm.habits.where((h) => habitAppliesOnDate(h, _selectedDay)).toList();
+    final urgentIds = vm.urgentHabits
+        .map((u) => u.habit.id)
+        .whereType<int>()
+        .toSet();
+    final allHabits = vm.habits
+        .where((h) => habitAppliesOnDate(h, _selectedDay))
+        .toList();
 
-    final daily =
-        allHabits.where((h) => h.recurrence == HabitRecurrence.daily).toList();
-    final weekly =
-        allHabits.where((h) => h.recurrence == HabitRecurrence.weekly).toList();
+    final daily = allHabits
+        .where((h) => h.recurrence == HabitRecurrence.daily)
+        .toList();
+    final weekly = allHabits
+        .where((h) => h.recurrence == HabitRecurrence.weekly)
+        .toList();
     final monthly = allHabits
         .where((h) => h.recurrence == HabitRecurrence.monthly)
         .toList();
 
     final widgets = <Widget>[
       Text(
-        _formatSelectedHeading(_selectedDay),
-        style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        _formatSelectedHeading(_selectedDay).toUpperCase(),
+        style: textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 2.0,
+          color: scheme.onSurface,
+        ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 12),
     ];
 
     if (allHabits.isEmpty) {
       widgets.add(
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'No habits for this date. Add one on Home or choose a day on/after each habit\'s start date.',
-              style: textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Text(
+            '// no habits for this date',
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              letterSpacing: 0.3,
             ),
           ),
         ),
       );
     } else {
-      if (daily.isNotEmpty) {
-        widgets.add(_sectionHeader('Daily', textTheme, scheme));
-        widgets.addAll(
-          daily.map(
-            (h) => _HabitDayTile(
+      Future<void> deleteHabit(Habit h) async {
+        final confirmFirst =
+            context.read<SettingsViewModel>().confirmBeforeDelete;
+        if (confirmFirst) {
+          final go = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Delete habit?'),
+              content: Text('Remove "${h.title}" and all its tracking data?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+          if (go != true) return;
+        }
+        vm.deleteHabit(h);
+      }
+
+      void addGroup(String label, List<Habit> group) {
+        if (group.isEmpty) return;
+        widgets.add(_sectionHeader(label, textTheme, scheme));
+        final isPastDay = habitDateOnly(_selectedDay).isBefore(habitDateOnly(DateTime.now()));
+        for (final h in group) {
+          final completed = vm.isHabitCompletedOn(h, _selectedDay);
+          widgets.add(
+            _HabitDayTile(
               habit: h,
-              completed: vm.isHabitCompletedOn(h, _selectedDay),
+              completed: completed,
+              isMissed: isPastDay && !completed,
               canMarkComplete: !_isFutureDay(_selectedDay),
               onToggle: () => vm.toggleHabitCompletion(h, _selectedDay),
+              onDelete: () => deleteHabit(h),
               isUrgent: urgentIds.contains(h.id),
+              displayRecurrence: vm.recurrenceForHabitOnDate(h, _selectedDay),
+              nextChange: vm.nextChangeAfterDate(h, _selectedDay),
             ),
-          ),
-        );
+          );
+        }
       }
-      if (weekly.isNotEmpty) {
-        widgets.add(_sectionHeader('Weekly', textTheme, scheme));
-        widgets.addAll(
-          weekly.map(
-            (h) => _HabitDayTile(
-              habit: h,
-              completed: vm.isHabitCompletedOn(h, _selectedDay),
-              canMarkComplete: !_isFutureDay(_selectedDay),
-              onToggle: () => vm.toggleHabitCompletion(h, _selectedDay),
-              isUrgent: urgentIds.contains(h.id),
-            ),
-          ),
-        );
-      }
-      if (monthly.isNotEmpty) {
-        widgets.add(_sectionHeader('Monthly', textTheme, scheme));
-        widgets.addAll(
-          monthly.map(
-            (h) => _HabitDayTile(
-              habit: h,
-              completed: vm.isHabitCompletedOn(h, _selectedDay),
-              canMarkComplete: !_isFutureDay(_selectedDay),
-              onToggle: () => vm.toggleHabitCompletion(h, _selectedDay),
-              isUrgent: urgentIds.contains(h.id),
-            ),
-          ),
-        );
-      }
+
+      addGroup('Daily', daily);
+      addGroup('Weekly', weekly);
+      addGroup('Monthly', monthly);
     }
 
     widgets.add(const SizedBox(height: 28));
@@ -135,11 +155,13 @@ class _CalendarPageState extends State<CalendarPage> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: scheme.surfaceContainerLowest,
+      backgroundColor: scheme.surface,
       appBar: AppBar(
         title: const Text('Calendar'),
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: scheme.outlineVariant),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -151,10 +173,11 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Tap a day to see and log your habits. Future days are disabled.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            '// select a day to view and log habits',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              letterSpacing: 0.3,
+            ),
           ),
           const SizedBox(height: 16),
           _MonthGrid(
@@ -165,6 +188,8 @@ class _CalendarPageState extends State<CalendarPage> {
             today: habitDateOnly(DateTime.now()),
             weekStartsOnMonday: vm.weekStartsOnMonday,
           ),
+          const SizedBox(height: 20),
+          Divider(height: 1, color: scheme.outlineVariant),
           const SizedBox(height: 16),
           ..._habitsForDay(context, vm, scheme),
         ],
@@ -178,26 +203,40 @@ bool _isFutureDay(DateTime d) =>
 
 String _formatSelectedHeading(DateTime d) {
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return '${months[d.month - 1]} ${d.day}, ${d.year}';
 }
 
-Widget _sectionHeader(
-  String label,
-  TextTheme textTheme,
-  ColorScheme scheme,
-) {
+Widget _sectionHeader(String label, TextTheme textTheme, ColorScheme scheme) {
   return Padding(
-    padding: const EdgeInsets.only(top: 16, bottom: 4),
-    child: Text(
-      label,
-      style: textTheme.labelLarge?.copyWith(
-        color: scheme.onSurfaceVariant,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
-      ),
+    padding: const EdgeInsets.only(top: 20, bottom: 2),
+    child: Row(
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2.0,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+        ),
+      ],
     ),
   );
 }
@@ -216,28 +255,39 @@ class _MonthHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const names = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     final label = '${names[month.month - 1]} ${month.year}';
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        IconButton.filledTonal(
+        IconButton(
           onPressed: onPrev,
-          icon: const Icon(Icons.chevron_left),
+          icon: const Icon(Icons.chevron_left, size: 20),
+          visualDensity: VisualDensity.compact,
         ),
-        const SizedBox(width: 8),
         Text(
-          label,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2.0,
+          ),
         ),
-        const SizedBox(width: 8),
-        IconButton.filledTonal(
+        IconButton(
           onPressed: onNext,
-          icon: const Icon(Icons.chevron_right),
+          icon: const Icon(Icons.chevron_right, size: 20),
+          visualDensity: VisualDensity.compact,
         ),
       ],
     );
@@ -268,6 +318,7 @@ class _MonthGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final year = month.year;
     final m = month.month;
     final daysInMonth = DateTime(year, m + 1, 0).day;
@@ -276,8 +327,10 @@ class _MonthGrid extends StatelessWidget {
     final totalCells = ((leading + daysInMonth + 6) ~/ 7) * 7;
     final labels = _weekdayLabels(weekStartsOnMonday);
 
-    return Card(
-      elevation: 2,
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant, width: 1),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -289,10 +342,12 @@ class _MonthGrid extends StatelessWidget {
                       child: Center(
                         child: Text(
                           d,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                                color: scheme.onSurfaceVariant,
+                              ),
                         ),
                       ),
                     ),
@@ -352,12 +407,13 @@ class _DayCell extends StatelessWidget {
   final void Function(DateTime day) onSelectDay;
   final DateTime today;
 
-  static const _colorGreen = Color(0xFF43A047);   // green 600
-  static const _colorAmber = Color(0xFFFB8C00);   // orange 600
-  static const _colorRed = Color(0xFFE53935);     // red 600
+  // Darker shades so white text is legible in both light and dark mode.
+  static const _colorGreen = Color(0xFF2E7D32); // green 800
+  static const _colorAmber = Color(0xFFE65100); // deepOrange 900
+  static const _colorRed = Color(0xFFB71C1C);   // red 900
 
-  Color _cellColor(bool isFuture, int completed, int total) {
-    if (isFuture || total == 0) return Colors.transparent;
+  Color? _cellColor(bool isFuture, int completed, int total) {
+    if (isFuture || total == 0) return null;
     final frac = completed / total;
     if (frac >= 1.0) return _colorGreen;
     if (frac >= 0.5) return _colorAmber;
@@ -378,27 +434,42 @@ class _DayCell extends StatelessWidget {
         day.month == selectedDay.month &&
         day.day == selectedDay.day;
     final summary = summaryForDay(day);
+    final scheme = Theme.of(context).colorScheme;
+
     final cellColor = _cellColor(isFuture, summary.completed, summary.total);
-    final isColored = cellColor != Colors.transparent;
-    final textColor = isColored ? Colors.white : (isFuture ? Colors.black26 : null);
+    final isColored = cellColor != null;
+
+    // Text color: white on colored cells; theme-aware on plain cells.
+    final textColor = isColored
+        ? Colors.white
+        : (isFuture
+            ? scheme.onSurface.withValues(alpha: 0.3)
+            : scheme.onSurface);
+
+    // Background: saturated color when there's data, else theme surface.
+    final bgColor = isColored
+        ? cellColor
+        : (isFuture
+            ? scheme.surfaceContainerHighest
+            : scheme.surfaceContainer);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: isFuture ? null : () => onSelectDay(day),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(2),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           height: 52,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(2),
             border: Border.all(
               color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : (isColored ? Colors.transparent : Colors.black12),
+                  ? scheme.primary
+                  : (isColored ? Colors.transparent : scheme.outlineVariant),
               width: isSelected ? 2 : 1,
             ),
-            color: isColored ? cellColor : (isFuture ? Colors.grey.shade100 : Colors.white),
+            color: bgColor,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -406,17 +477,17 @@ class _DayCell extends StatelessWidget {
               Text(
                 '$dayNum',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
               ),
               if (summary.total > 0 && !isFuture)
                 Text(
                   '${summary.completed}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: textColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
             ],
           ),
@@ -430,56 +501,159 @@ class _HabitDayTile extends StatelessWidget {
   const _HabitDayTile({
     required this.habit,
     required this.completed,
+    required this.isMissed,
     required this.canMarkComplete,
     required this.onToggle,
+    required this.onDelete,
     this.isUrgent = false,
+    required this.displayRecurrence,
+    this.nextChange,
   });
 
   final Habit habit;
   final bool completed;
+  final bool isMissed;
   final bool canMarkComplete;
   final VoidCallback onToggle;
+  final VoidCallback onDelete;
   final bool isUrgent;
+  final HabitRecurrence displayRecurrence;
+  final ({DateTime on, HabitRecurrence to})? nextChange;
 
   @override
   Widget build(BuildContext context) {
     final canTrack = habit.id != null && canMarkComplete;
     final showUrgent = isUrgent && !completed;
-    final startLine = habit.startDate != null
-        ? 'Starts ${_formatShort(habit.startDate!)}'
-        : null;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: showUrgent ? Colors.orange.shade50 : null,
-      shape: showUrgent
-          ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.orange.shade300, width: 1.5),
-            )
-          : null,
-      child: CheckboxListTile(
-        value: canTrack ? completed : false,
-        onChanged: canTrack ? (_) => onToggle() : null,
-        title: Text(habit.title),
-        subtitle: Text(
-          [
-            if (habit.description.isNotEmpty) habit.description,
-            if (habit.category.isNotEmpty) habit.category,
-            ?startLine,
-          ].join('\n'),
-          style: Theme.of(context).textTheme.bodySmall,
+    final wasChanged = nextChange != null;
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final subtitleParts = [
+      if (habit.description.isNotEmpty) habit.description,
+      if (habit.category.isNotEmpty) habit.category,
+      if (habit.endDate != null) 'until ${_formatShort(habit.endDate!)}',
+      if (wasChanged)
+        '→ ${nextChange!.to.displayName} on ${_formatShort(nextChange!.on)}',
+    ];
+
+    IconData iconData;
+    Color iconColor;
+    if (showUrgent) {
+      iconData = Icons.warning_amber_rounded;
+      iconColor = Colors.orange.shade700;
+    } else if (wasChanged) {
+      iconData = Icons.edit_calendar_rounded;
+      iconColor = scheme.onSurfaceVariant;
+    } else {
+      iconData = completed ? Icons.check_circle_rounded : Icons.circle_outlined;
+      iconColor = completed ? const Color(0xFF2E7D32) : scheme.outlineVariant;
+    }
+
+    return InkWell(
+      onTap: canTrack ? onToggle : null,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: scheme.outlineVariant, width: 1),
+            left: BorderSide(
+              color: showUrgent
+                  ? Colors.orange.shade700
+                  : Colors.transparent,
+              width: 3,
+            ),
+          ),
         ),
-        secondary: showUrgent
-            ? Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700)
-            : Icon(
-                completed
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
-                color: completed ? Colors.green : Colors.grey,
+        padding: EdgeInsets.only(
+          left: showUrgent ? 10 : 0,
+          right: 0,
+          top: 12,
+          bottom: 12,
+        ),
+        child: Row(
+          children: [
+            Icon(iconData, color: iconColor, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CustomPaint(
+                    foregroundPainter: isMissed
+                        ? _WavyUnderlinePainter(const Color(0xFFB71C1C))
+                        : null,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: isMissed ? 5 : 0),
+                      child: Text(
+                        habit.title,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          decoration: completed ? TextDecoration.lineThrough : null,
+                          decorationColor: scheme.onSurface.withValues(alpha: 0.4),
+                          color: completed
+                              ? scheme.onSurface.withValues(alpha: 0.4)
+                              : scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (subtitleParts.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        subtitleParts.join(' · '),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: scheme.error,
+                size: 18,
+              ),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _WavyUnderlinePainter extends CustomPainter {
+  const _WavyUnderlinePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    const amplitude = 2.2;
+    const wavelength = 6.0;
+    final y = size.height - 1.5;
+
+    final path = Path()..moveTo(0, y);
+    for (var x = 0.0; x <= size.width; x += 0.5) {
+      path.lineTo(x, y + sin((x / wavelength) * 2 * pi) * amplitude);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_WavyUnderlinePainter old) => old.color != color;
 }
 
 String _formatShort(DateTime d) {

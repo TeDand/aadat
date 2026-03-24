@@ -223,33 +223,84 @@ class _HabitsListViewState extends State<HabitsListView> {
   }
 
   Widget _habitTile(BuildContext context, Habit habit, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => _showHabitEditor(context, habit),
-          icon: Icon(
-            _iconForRecurrence(habit.recurrence),
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
-          label: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(habit.title, semanticsLabel: habit.title),
-              if (habit.description.isNotEmpty)
-                Text(
-                  habit.description,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+    final scheme = theme.colorScheme;
+
+    Future<void> onDelete() async {
+      final settings = context.read<SettingsViewModel>();
+      if (settings.confirmBeforeDelete) {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete habit?'),
+            content: Text('Remove "${habit.title}" and all its tracking data?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Delete'),
+              ),
             ],
           ),
+        );
+        if (go != true) return;
+      }
+      if (context.mounted) context.read<HomeViewModel>().deleteHabit(habit);
+    }
+
+    return InkWell(
+      onTap: () => _showHabitEditor(context, habit),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: scheme.outlineVariant, width: 1),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              _iconForRecurrence(habit.recurrence),
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    habit.title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (habit.description.isNotEmpty)
+                    Text(
+                      habit.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: scheme.error,
+                size: 18,
+              ),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+            ),
+          ],
         ),
       ),
     );
@@ -289,6 +340,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
   late final FocusNode _categoryFocus;
   late HabitRecurrence _recurrence;
   DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -300,8 +352,12 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
     _categoryController = TextEditingController(text: widget.habit.category);
     _categoryFocus = FocusNode();
     _recurrence = widget.habit.recurrence;
+    // New habits default to starting today; existing habits keep their stored date.
     _startDate = widget.habit.startDate != null
         ? habitDateOnly(widget.habit.startDate!)
+        : (widget.isNew ? habitDateOnly(DateTime.now()) : null);
+    _endDate = widget.habit.endDate != null
+        ? habitDateOnly(widget.habit.endDate!)
         : null;
   }
 
@@ -424,38 +480,18 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
               ),
             ),
             const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Start date'),
-              subtitle: Text(
-                _startDate == null
-                    ? 'No start date (applies from the beginning)'
-                    : '${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')}',
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_startDate != null)
-                    TextButton(
-                      onPressed: () => setState(() => _startDate = null),
-                      child: const Text('Clear'),
-                    ),
-                  TextButton(
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _startDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() => _startDate = habitDateOnly(picked));
-                      }
-                    },
-                    child: const Text('Set'),
-                  ),
-                ],
-              ),
+            _DatePickerRow(
+              label: 'Start date',
+              date: _startDate,
+              onClear: () => setState(() => _startDate = null),
+              onSet: (d) => setState(() => _startDate = d),
+            ),
+            _DatePickerRow(
+              label: 'End date',
+              hint: 'Optional — habit stops appearing after this day',
+              date: _endDate,
+              onClear: () => setState(() => _endDate = null),
+              onSet: (d) => setState(() => _endDate = d),
             ),
             const SizedBox(height: 24),
             Row(
@@ -474,6 +510,8 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
                       recurrence: _recurrence,
                       startDate: _startDate,
                       clearStartDate: _startDate == null,
+                      endDate: _endDate,
+                      clearEndDate: _endDate == null,
                     );
                     final r = await widget.onCommit(updated);
                     if (!context.mounted) return;
@@ -489,6 +527,58 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DatePickerRow extends StatelessWidget {
+  const _DatePickerRow({
+    required this.label,
+    this.hint,
+    required this.date,
+    required this.onClear,
+    required this.onSet,
+  });
+
+  final String label;
+  final String? hint;
+  final DateTime? date;
+  final VoidCallback onClear;
+  final void Function(DateTime) onSet;
+
+  String get _subtitle {
+    if (date == null) return hint ?? 'Not set';
+    return '${date!.year}-${date!.month.toString().padLeft(2, '0')}-${date!.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label),
+      subtitle: Text(_subtitle),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (date != null)
+            TextButton(
+              onPressed: onClear,
+              child: const Text('Clear'),
+            ),
+          TextButton(
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: date ?? DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) onSet(habitDateOnly(picked));
+            },
+            child: const Text('Set'),
+          ),
+        ],
       ),
     );
   }
