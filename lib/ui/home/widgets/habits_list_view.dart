@@ -223,33 +223,84 @@ class _HabitsListViewState extends State<HabitsListView> {
   }
 
   Widget _habitTile(BuildContext context, Habit habit, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => _showHabitEditor(context, habit),
-          icon: Icon(
-            _iconForRecurrence(habit.recurrence),
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
-          label: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(habit.title, semanticsLabel: habit.title),
-              if (habit.description.isNotEmpty)
-                Text(
-                  habit.description,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+    final scheme = theme.colorScheme;
+
+    Future<void> onDelete() async {
+      final settings = context.read<SettingsViewModel>();
+      if (settings.confirmBeforeDelete) {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete habit?'),
+            content: Text('Remove "${habit.title}" and all its tracking data?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Delete'),
+              ),
             ],
           ),
+        );
+        if (go != true) return;
+      }
+      if (context.mounted) context.read<HomeViewModel>().deleteHabit(habit);
+    }
+
+    return InkWell(
+      onTap: () => _showHabitEditor(context, habit),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: scheme.outlineVariant, width: 1),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              _iconForRecurrence(habit.recurrence),
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    habit.title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (habit.description.isNotEmpty)
+                    Text(
+                      habit.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: scheme.error,
+                size: 18,
+              ),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+            ),
+          ],
         ),
       ),
     );

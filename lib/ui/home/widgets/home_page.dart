@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_dialog.dart';
@@ -63,8 +62,20 @@ class _HomePageState extends State<HomePage> {
       _recurrence = HabitRecurrence.daily;
       _startDate = habitDateOnly(DateTime.now());
     });
+    _showAddedToast(context);
   }
 
+  void _showAddedToast(BuildContext context) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => _FadeToast(
+        message: '// habit added',
+        onDone: () => entry.remove(),
+      ),
+    );
+    overlay.insert(entry);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -290,27 +301,112 @@ class _AadatWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final highlight = Color.lerp(foreground, const Color(0xFFFFE082), 0.4)!;
-    return ShaderMask(
-      blendMode: BlendMode.srcIn,
-      shaderCallback: (bounds) => LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          foreground,
-          highlight,
-        ],
-      ).createShader(bounds),
-      child: Text(
-        'aadat',
-        style: GoogleFonts.syne(
-          fontSize: 26,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 4,
-          height: 1,
-          color: Colors.white,
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          '>_',
+          style: textTheme.bodySmall?.copyWith(
+            color: foreground.withValues(alpha: 0.45),
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'aadat',
+          style: textTheme.titleMedium?.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FadeToast extends StatefulWidget {
+  const _FadeToast({required this.message, required this.onDone});
+
+  final String message;
+  final VoidCallback onDone;
+
+  @override
+  State<_FadeToast> createState() => _FadeToastState();
+}
+
+class _FadeToastState extends State<_FadeToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _ctrl.forward().then((_) async {
+      await Future.delayed(const Duration(milliseconds: 1400));
+      if (mounted) await _ctrl.reverse();
+      widget.onDone();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Positioned(
+      bottom: 32,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: FadeTransition(
+          opacity: _opacity,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: scheme.inverseSurface,
+              border: Border.all(
+                color: const Color(0xFF2E7D32).withValues(alpha: 0.6),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.check,
+                  color: Color(0xFF2E7D32),
+                  size: 13,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.message,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onInverseSurface,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
+    ),
     );
   }
 }

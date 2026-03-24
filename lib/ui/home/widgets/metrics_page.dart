@@ -19,17 +19,11 @@ class MetricsPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: Text(
-          'Metrics',
-          style: textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.3,
-          ),
+        title: const Text('Metrics'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: scheme.outlineVariant),
         ),
-        backgroundColor: scheme.surfaceContainerLowest,
-        foregroundColor: scheme.onSurface,
-        elevation: 0,
-        scrolledUnderElevation: 0.5,
       ),
       body: habitStats.isEmpty
           ? _EmptyMetrics(scheme: scheme, textTheme: textTheme)
