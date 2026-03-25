@@ -364,6 +364,7 @@ class HomeViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
 
+    await _completions.init();
     _habits = await _habitService.fetchHabits();
 
     _loading = false;

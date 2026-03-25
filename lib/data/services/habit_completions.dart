@@ -1,12 +1,27 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../repositories/habit_model.dart';
 
 /// Tracks completions: daily per day; weekly per week (week start date); monthly per month.
 /// Keys: `d|id|yyyy-MM-dd`, `w|id|yyyy-MM-dd`, `m|id|yyyy-MM`
 class HabitCompletionService {
   final Set<String> _keys = {};
+  bool _initialized = false;
 
-  HabitCompletionService() {
+  HabitCompletionService();
+
+  Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('completions_v1') ?? [];
+    _keys.addAll(saved);
     _migrateLegacyKeys();
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('completions_v1', _keys.toList());
   }
 
   void _migrateLegacyKeys() {
@@ -103,6 +118,7 @@ class HabitCompletionService {
           _keys.add('m|$id|${_monthPayload(d.year, d.month)}');
       }
     }
+    _save();
   }
 
   bool _weekHasAnyTrackableDay(
