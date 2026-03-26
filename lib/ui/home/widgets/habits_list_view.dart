@@ -485,7 +485,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
             ),
             if (_recurrence == HabitRecurrence.custom) ...[
               const SizedBox(height: 12),
-              _DayPicker(
+              DayPicker(
                 selectedDays: _customDays,
                 onChanged: (days) => setState(() => _customDays = days),
               ),
@@ -567,8 +567,8 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
 
 /// Compact day-of-week picker used when recurrence is set to Custom.
 /// [selectedDays] uses Dart's [DateTime.weekday] values: 1=Mon … 7=Sun.
-class _DayPicker extends StatelessWidget {
-  const _DayPicker({required this.selectedDays, required this.onChanged});
+class DayPicker extends StatelessWidget {
+  const DayPicker({super.key, required this.selectedDays, required this.onChanged});
 
   final Set<int> selectedDays;
   final void Function(Set<int>) onChanged;

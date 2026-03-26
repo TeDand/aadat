@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_dialog.dart';
+import 'habits_list_view.dart';
 import 'habits_page.dart';
 import 'package:aadat/data/repositories/habit_model.dart';
 
@@ -20,6 +21,7 @@ class _HomePageState extends State<HomePage> {
   final _descFocus = FocusNode();
   final _categoryFocus = FocusNode();
   HabitRecurrence _recurrence = HabitRecurrence.daily;
+  Set<int> _customDays = {};
   late DateTime _startDate;
 
   @override
@@ -41,11 +43,29 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _addHabit(HomeViewModel viewModel) async {
     if (_titleController.text.trim().isEmpty) return;
+    var recurrence = _recurrence;
+    List<int> customDays = [];
+    if (_recurrence == HabitRecurrence.custom) {
+      if (_customDays.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Select at least one day.')),
+        );
+        return;
+      }
+      if (_customDays.length == 7) {
+        recurrence = HabitRecurrence.daily;
+      } else if (_customDays.length == 1) {
+        recurrence = HabitRecurrence.weekly;
+      } else {
+        customDays = _customDays.toList()..sort();
+      }
+    }
     final newHabit = Habit(
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
       category: _categoryController.text.trim(),
-      recurrence: _recurrence,
+      recurrence: recurrence,
+      customDays: customDays,
       startDate: _startDate,
     );
     final r = await viewModel.addHabit(newHabit);
@@ -60,6 +80,7 @@ class _HomePageState extends State<HomePage> {
     _categoryController.clear();
     setState(() {
       _recurrence = HabitRecurrence.daily;
+      _customDays = {};
       _startDate = habitDateOnly(DateTime.now());
     });
     _showAddedToast(context);
@@ -201,6 +222,13 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+            if (_recurrence == HabitRecurrence.custom) ...[
+              const SizedBox(height: 12),
+              DayPicker(
+                selectedDays: _customDays,
+                onChanged: (days) => setState(() => _customDays = days),
+              ),
+            ],
             const SizedBox(height: 8),
             ListTile(
               contentPadding: EdgeInsets.zero,
