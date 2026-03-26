@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:aadat/ui/home/widgets/calendar_page.dart';
 import 'package:aadat/ui/home/widgets/habits_page.dart';
 import 'package:aadat/ui/home/widgets/metrics_page.dart';
-import 'package:aadat/ui/settings/settings_dialog.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -81,11 +80,6 @@ ThemeData _appThemeFromScheme(ColorScheme colorScheme) {
       color: colorScheme.outlineVariant,
       thickness: 1,
       space: 1,
-    ),
-    navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: colorScheme.surfaceContainerLow,
-      elevation: 0,
-      indicatorColor: colorScheme.primaryContainer,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -172,66 +166,38 @@ class _RouterState extends State<Router> {
         page = HomePage();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Scaffold(
-          body: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: NavigationRail(
-                        extended: constraints.maxWidth >= 600,
-                        destinations: const [
-                          NavigationRailDestination(
-                            icon: Icon(Icons.home),
-                            label: Text('Home'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.checklist),
-                            label: Text('Habits'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.calendar_month),
-                            label: Text('Calendar'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.insights_rounded),
-                            label: Text('Metrics'),
-                          ),
-                        ],
-                        selectedIndex: selectedIndex,
-                        onDestinationSelected: (value) {
-                          setState(() {
-                            selectedIndex = value;
-                          });
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 8),
-                      child: IconButton(
-                        tooltip: 'Settings',
-                        icon: const Icon(Icons.settings_outlined),
-                        onPressed: () => showAppSettingsDialog(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ColoredBox(
-                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                  child: page,
-                ),
-              ),
-            ],
+    return Scaffold(
+      body: page,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (value) {
+          setState(() {
+            selectedIndex = value;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
-        );
-      },
+          NavigationDestination(
+            icon: Icon(Icons.checklist_outlined),
+            selectedIcon: Icon(Icons.checklist),
+            label: 'Habits',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Calendar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights_rounded),
+            label: 'Metrics',
+          ),
+        ],
+      ),
     );
   }
 }

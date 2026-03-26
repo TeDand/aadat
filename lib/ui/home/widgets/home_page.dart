@@ -89,6 +89,13 @@ class _HomePageState extends State<HomePage> {
         title: _AadatWordmark(foreground: scheme.onPrimary),
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
+        actions: [
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => showAppSettingsDialog(context),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
