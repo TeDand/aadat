@@ -116,6 +116,9 @@ class HabitCompletionService {
         case HabitRecurrence.monthly:
           if (!_monthHasAnyTrackableDay(d.year, d.month, today, start)) return;
           _keys.add('m|$id|${_monthPayload(d.year, d.month)}');
+        case HabitRecurrence.custom:
+          // Custom habits are tracked per individual day, just like daily.
+          _keys.add('d|$id|${_dateKey(d)}');
       }
     }
     _save();

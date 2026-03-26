@@ -65,6 +65,9 @@ class _CalendarPageState extends State<CalendarPage> {
     final monthly = allHabits
         .where((h) => h.recurrence == HabitRecurrence.monthly)
         .toList();
+    final custom = allHabits
+        .where((h) => h.recurrence == HabitRecurrence.custom)
+        .toList();
 
     final widgets = <Widget>[
       Text(
@@ -143,6 +146,7 @@ class _CalendarPageState extends State<CalendarPage> {
       addGroup('Daily', daily);
       addGroup('Weekly', weekly);
       addGroup('Monthly', monthly);
+      addGroup('Custom', custom);
     }
 
     widgets.add(const SizedBox(height: 28));

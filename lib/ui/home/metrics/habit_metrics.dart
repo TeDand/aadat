@@ -49,11 +49,13 @@ class HabitStats {
     HabitRecurrence.daily => 'days',
     HabitRecurrence.weekly => 'weeks',
     HabitRecurrence.monthly => 'months',
+    HabitRecurrence.custom => 'weeks',
   };
 
   static String _caption(HabitRecurrence r) => switch (r) {
     HabitRecurrence.daily => 'last 30 days',
     HabitRecurrence.weekly => 'last 8 weeks',
     HabitRecurrence.monthly => 'last 6 months',
+    HabitRecurrence.custom => 'last 8 weeks',
   };
 }

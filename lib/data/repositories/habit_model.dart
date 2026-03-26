@@ -1,6 +1,6 @@
 import 'dart:math' show max;
 
-enum HabitRecurrence { daily, weekly, monthly }
+enum HabitRecurrence { daily, weekly, monthly, custom }
 
 extension HabitRecurrenceLabel on HabitRecurrence {
   String get displayName {
@@ -11,6 +11,8 @@ extension HabitRecurrenceLabel on HabitRecurrence {
         return 'Weekly';
       case HabitRecurrence.monthly:
         return 'Monthly';
+      case HabitRecurrence.custom:
+        return 'Custom';
     }
   }
 }
@@ -28,6 +30,7 @@ DateTime weekStartForDate(DateTime date, {required bool weekStartsOnMonday}) {
 }
 
 /// Whether [habit] is in effect on this calendar [date] (start/end date rules).
+/// For custom recurrence, also checks that [date]'s weekday is in customDays.
 bool habitAppliesOnDate(Habit habit, DateTime date) {
   final d = habitDateOnly(date);
   if (habit.startDate != null && d.isBefore(habitDateOnly(habit.startDate!))) {
@@ -35,6 +38,9 @@ bool habitAppliesOnDate(Habit habit, DateTime date) {
   }
   if (habit.endDate != null && d.isAfter(habitDateOnly(habit.endDate!))) {
     return false;
+  }
+  if (habit.recurrence == HabitRecurrence.custom) {
+    return habit.customDays.contains(d.weekday); // 1=Mon … 7=Sun
   }
   return true;
 }
@@ -68,6 +74,9 @@ class Habit {
   /// User-defined label, e.g. "Health", "Work".
   String category;
   HabitRecurrence recurrence;
+  /// Weekdays on which this habit applies when [recurrence] is [HabitRecurrence.custom].
+  /// Values 1–7 (Monday=1, Sunday=7), matching [DateTime.weekday].
+  List<int> customDays;
   /// First day this habit applies (optional). Compared as calendar dates only.
   DateTime? startDate;
   /// Last day this habit applies (optional). Habit disappears from calendar after this date.
@@ -81,6 +90,7 @@ class Habit {
     this.createdTime,
     this.category = '',
     this.recurrence = HabitRecurrence.daily,
+    this.customDays = const [],
     this.startDate,
     this.endDate,
   });
@@ -93,6 +103,7 @@ class Habit {
     DateTime? createdTime,
     String? category,
     HabitRecurrence? recurrence,
+    List<int>? customDays,
     DateTime? startDate,
     bool clearStartDate = false,
     DateTime? endDate,
@@ -106,6 +117,7 @@ class Habit {
       createdTime: createdTime ?? this.createdTime,
       category: category ?? this.category,
       recurrence: recurrence ?? this.recurrence,
+      customDays: customDays ?? this.customDays,
       startDate: clearStartDate ? null : (startDate ?? this.startDate),
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
     );
@@ -119,6 +131,7 @@ class Habit {
     HabitFields.createdTime: createdTime?.toIso8601String(),
     HabitFields.category: category,
     HabitFields.recurrence: recurrence.name,
+    HabitFields.customDays: customDays.isEmpty ? '' : customDays.join(','),
     HabitFields.startDate: startDate != null ? _dateKeyForJson(startDate!) : null,
     HabitFields.endDate: endDate != null ? _dateKeyForJson(endDate!) : null,
   };
@@ -133,6 +146,7 @@ class Habit {
     ),
     category: (json[HabitFields.category] as String?) ?? '',
     recurrence: _parseRecurrence(json[HabitFields.recurrence] as String?),
+    customDays: _parseCustomDays(json[HabitFields.customDays] as String?),
     startDate: _parseStartDate(json[HabitFields.startDate] as String?),
     endDate: _parseStartDate(json[HabitFields.endDate] as String?),
   );
@@ -158,6 +172,16 @@ HabitRecurrence _parseRecurrence(String? raw) {
   );
 }
 
+List<int> _parseCustomDays(String? raw) {
+  if (raw == null || raw.isEmpty) return [];
+  return raw
+      .split(',')
+      .map((s) => int.tryParse(s.trim()))
+      .whereType<int>()
+      .where((d) => d >= 1 && d <= 7)
+      .toList();
+}
+
 class HabitFields {
   static const String tableName = 'habits';
   static const String idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
@@ -170,6 +194,7 @@ class HabitFields {
   static const String createdTime = 'created_time';
   static const String category = 'category';
   static const String recurrence = 'recurrence';
+  static const String customDays = 'custom_days';
   static const String startDate = 'start_date';
   static const String endDate = 'end_date';
 
@@ -181,6 +206,7 @@ class HabitFields {
     createdTime,
     category,
     recurrence,
+    customDays,
     startDate,
     endDate,
   ];
