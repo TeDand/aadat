@@ -314,6 +314,8 @@ class _HabitsListViewState extends State<HabitsListView> {
         return Icons.date_range;
       case HabitRecurrence.monthly:
         return Icons.calendar_month;
+      case HabitRecurrence.custom:
+        return Icons.tune;
     }
   }
 }
@@ -339,6 +341,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
   late final TextEditingController _categoryController;
   late final FocusNode _categoryFocus;
   late HabitRecurrence _recurrence;
+  late Set<int> _customDays; // 1=Mon … 7=Sun
   DateTime? _startDate;
   DateTime? _endDate;
 
@@ -352,6 +355,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
     _categoryController = TextEditingController(text: widget.habit.category);
     _categoryFocus = FocusNode();
     _recurrence = widget.habit.recurrence;
+    _customDays = Set<int>.from(widget.habit.customDays);
     // New habits default to starting today; existing habits keep their stored date.
     _startDate = widget.habit.startDate != null
         ? habitDateOnly(widget.habit.startDate!)
@@ -479,6 +483,13 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
                 ),
               ),
             ),
+            if (_recurrence == HabitRecurrence.custom) ...[
+              const SizedBox(height: 12),
+              DayPicker(
+                selectedDays: _customDays,
+                onChanged: (days) => setState(() => _customDays = days),
+              ),
+            ],
             const SizedBox(height: 8),
             _DatePickerRow(
               label: 'Start date',
@@ -503,11 +514,33 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    // Auto-classify custom days:
+                    // 7 days → daily, 1 day → weekly, 2–6 → custom, 0 → error.
+                    var recurrence = _recurrence;
+                    List<int> customDays = [];
+                    if (_recurrence == HabitRecurrence.custom) {
+                      if (_customDays.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Select at least one day.'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (_customDays.length == 7) {
+                        recurrence = HabitRecurrence.daily;
+                      } else if (_customDays.length == 1) {
+                        recurrence = HabitRecurrence.weekly;
+                      } else {
+                        customDays = _customDays.toList()..sort();
+                      }
+                    }
                     final updated = widget.habit.copy(
                       title: _titleController.text,
                       description: _descriptionController.text,
                       category: _categoryController.text.trim(),
-                      recurrence: _recurrence,
+                      recurrence: recurrence,
+                      customDays: customDays,
                       startDate: _startDate,
                       clearStartDate: _startDate == null,
                       endDate: _endDate,
@@ -528,6 +561,84 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Compact day-of-week picker used when recurrence is set to Custom.
+/// [selectedDays] uses Dart's [DateTime.weekday] values: 1=Mon … 7=Sun.
+class DayPicker extends StatelessWidget {
+  const DayPicker({super.key, required this.selectedDays, required this.onChanged});
+
+  final Set<int> selectedDays;
+  final void Function(Set<int>) onChanged;
+
+  static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  static const _days   = [1,   2,   3,   4,   5,   6,   7];
+
+  String get _hint {
+    if (selectedDays.length == 7) return '→ All days selected, will save as Daily';
+    if (selectedDays.length == 1) return '→ One day selected, will save as Weekly';
+    if (selectedDays.isEmpty) return 'Select at least one day';
+    return '${selectedDays.length} days/week';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Days',
+          style: t.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(7, (i) {
+            final day = _days[i];
+            final selected = selectedDays.contains(day);
+            return GestureDetector(
+              onTap: () {
+                final next = Set<int>.from(selectedDays);
+                if (selected) {
+                  next.remove(day);
+                } else {
+                  next.add(day);
+                }
+                onChanged(next);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? scheme.primary : scheme.surfaceContainerHighest,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _labels[i],
+                  style: t.labelMedium?.copyWith(
+                    color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _hint,
+          style: t.bodySmall?.copyWith(
+            color: selectedDays.isEmpty ? scheme.error : scheme.onSurfaceVariant,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
     );
   }
 }

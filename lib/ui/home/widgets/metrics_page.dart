@@ -149,11 +149,13 @@ class _HabitStreakCard extends StatelessWidget {
   static const _dailyAccent = Color(0xFFEA580C);
   static const _weeklyAccent = Color(0xFF2563EB);
   static const _monthlyAccent = Color(0xFF059669);
+  static const _customAccent = Color(0xFF7C3AED);
 
   Color _accentFor(HabitRecurrence r) => switch (r) {
     HabitRecurrence.daily => _dailyAccent,
     HabitRecurrence.weekly => _weeklyAccent,
     HabitRecurrence.monthly => _monthlyAccent,
+    HabitRecurrence.custom => _customAccent,
   };
 
   @override
