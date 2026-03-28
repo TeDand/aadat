@@ -138,6 +138,8 @@ class _CalendarPageState extends State<CalendarPage> {
               isUrgent: urgentIds.contains(h.id),
               displayRecurrence: vm.recurrenceForHabitOnDate(h, _selectedDay),
               nextChange: vm.nextChangeAfterDate(h, _selectedDay),
+              note: vm.noteForHabit(h, _selectedDay),
+              onNoteChanged: (text) => vm.setNoteForHabit(h, _selectedDay, text),
             ),
           );
         }
@@ -512,6 +514,8 @@ class _HabitDayTile extends StatelessWidget {
     this.isUrgent = false,
     required this.displayRecurrence,
     this.nextChange,
+    this.note,
+    required this.onNoteChanged,
   });
 
   final Habit habit;
@@ -523,12 +527,60 @@ class _HabitDayTile extends StatelessWidget {
   final bool isUrgent;
   final HabitRecurrence displayRecurrence;
   final ({DateTime on, HabitRecurrence to})? nextChange;
+  final String? note;
+  final Future<void> Function(String) onNoteChanged;
+
+  void _showNoteDialog(BuildContext context) {
+    final ctrl = TextEditingController(text: note);
+    final scheme = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(habit.title),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            hintText: 'Add a note for this day…',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 4,
+          autofocus: true,
+          textInputAction: TextInputAction.newline,
+        ),
+        actions: [
+          if (note != null && note!.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                onNoteChanged('');
+                Navigator.of(ctx).pop();
+              },
+              child: Text(
+                'Clear',
+                style: TextStyle(color: scheme.error),
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              onNoteChanged(ctrl.text);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final canTrack = habit.id != null && canMarkComplete;
     final showUrgent = isUrgent && !completed;
     final wasChanged = nextChange != null;
+    final hasNote = note != null && note!.isNotEmpty;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -574,8 +626,12 @@ class _HabitDayTile extends StatelessWidget {
           bottom: 12,
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(iconData, color: iconColor, size: 20),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(iconData, color: iconColor, size: 20),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -610,10 +666,45 @@ class _HabitDayTile extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (hasNote)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.notes_rounded,
+                            size: 13,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              note!,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
-            const SizedBox(width: 4),
+            if (canMarkComplete)
+              IconButton(
+                icon: Icon(
+                  hasNote ? Icons.edit_note_rounded : Icons.note_add_outlined,
+                  color: hasNote ? scheme.primary : scheme.onSurfaceVariant,
+                  size: 18,
+                ),
+                onPressed: () => _showNoteDialog(context),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                tooltip: hasNote ? 'Edit note' : 'Add note',
+              ),
             IconButton(
               icon: Icon(
                 Icons.delete_outline_rounded,
