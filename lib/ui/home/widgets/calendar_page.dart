@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
-import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -95,32 +94,6 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
       );
     } else {
-      Future<void> deleteHabit(Habit h) async {
-        final confirmFirst =
-            context.read<SettingsViewModel>().confirmBeforeDelete;
-        if (confirmFirst) {
-          final go = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Delete habit?'),
-              content: Text('Remove "${h.title}" and all its tracking data?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-          );
-          if (go != true) return;
-        }
-        vm.deleteHabit(h);
-      }
-
       void addGroup(String label, List<Habit> group) {
         if (group.isEmpty) return;
         widgets.add(_sectionHeader(label, textTheme, scheme));
@@ -134,7 +107,6 @@ class _CalendarPageState extends State<CalendarPage> {
               isMissed: isPastDay && !completed,
               canMarkComplete: !_isFutureDay(_selectedDay),
               onToggle: () => vm.toggleHabitCompletion(h, _selectedDay),
-              onDelete: () => deleteHabit(h),
               isUrgent: urgentIds.contains(h.id),
               displayRecurrence: vm.recurrenceForHabitOnDate(h, _selectedDay),
               nextChange: vm.nextChangeAfterDate(h, _selectedDay),
@@ -510,7 +482,6 @@ class _HabitDayTile extends StatelessWidget {
     required this.isMissed,
     required this.canMarkComplete,
     required this.onToggle,
-    required this.onDelete,
     this.isUrgent = false,
     required this.displayRecurrence,
     this.nextChange,
@@ -523,7 +494,6 @@ class _HabitDayTile extends StatelessWidget {
   final bool isMissed;
   final bool canMarkComplete;
   final VoidCallback onToggle;
-  final VoidCallback onDelete;
   final bool isUrgent;
   final HabitRecurrence displayRecurrence;
   final ({DateTime on, HabitRecurrence to})? nextChange;
@@ -705,16 +675,6 @@ class _HabitDayTile extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 tooltip: hasNote ? 'Edit note' : 'Add note',
               ),
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                color: scheme.error,
-                size: 18,
-              ),
-              onPressed: onDelete,
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-            ),
           ],
         ),
       ),
