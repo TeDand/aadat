@@ -495,7 +495,10 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
               label: 'Start date',
               date: _startDate,
               onClear: () => setState(() => _startDate = null),
-              onSet: (d) => setState(() => _startDate = d),
+              onSet: (d) => setState(() {
+                _startDate = d;
+                if (_endDate != null && _endDate!.isBefore(d)) _endDate = null;
+              }),
             ),
             _DatePickerRow(
               label: 'End date',
@@ -503,6 +506,7 @@ class _HabitEditorSheetState extends State<_HabitEditorSheet> {
               date: _endDate,
               onClear: () => setState(() => _endDate = null),
               onSet: (d) => setState(() => _endDate = d),
+              firstDate: _startDate,
             ),
             const SizedBox(height: 24),
             Row(
@@ -650,6 +654,7 @@ class _DatePickerRow extends StatelessWidget {
     required this.date,
     required this.onClear,
     required this.onSet,
+    this.firstDate,
   });
 
   final String label;
@@ -657,6 +662,7 @@ class _DatePickerRow extends StatelessWidget {
   final DateTime? date;
   final VoidCallback onClear;
   final void Function(DateTime) onSet;
+  final DateTime? firstDate;
 
   String get _subtitle {
     if (date == null) return hint ?? 'Not set';
@@ -679,10 +685,14 @@ class _DatePickerRow extends StatelessWidget {
             ),
           TextButton(
             onPressed: () async {
+              final effectiveFirst = firstDate ?? DateTime(2000);
+              final effectiveInitial = (date != null && !date!.isBefore(effectiveFirst))
+                  ? date!
+                  : effectiveFirst;
               final picked = await showDatePicker(
                 context: context,
-                initialDate: date ?? DateTime.now(),
-                firstDate: DateTime(2000),
+                initialDate: effectiveInitial,
+                firstDate: effectiveFirst,
                 lastDate: DateTime(2100),
               );
               if (picked != null) onSet(habitDateOnly(picked));
