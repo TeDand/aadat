@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/habit_model.dart';
 import '../../../data/services/habit_completions.dart';
+import '../../../data/services/habit_notes.dart';
 import '../../../data/services/habits.dart';
 
 bool _isFutureCalendarDay(DateTime date) {
@@ -11,6 +12,7 @@ bool _isFutureCalendarDay(DateTime date) {
 class HomeViewModel extends ChangeNotifier {
   final HabitService _habitService = HabitService();
   final HabitCompletionService _completions = HabitCompletionService();
+  final HabitNoteService _notes = HabitNoteService();
   bool _loading = false;
   String? _message;
   List<Habit> _habits = [];
@@ -441,11 +443,25 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? noteForHabit(Habit habit, DateTime date) {
+    final id = habit.id;
+    if (id == null) return null;
+    return _notes.getNote(id, date);
+  }
+
+  Future<void> setNoteForHabit(Habit habit, DateTime date, String note) async {
+    final id = habit.id;
+    if (id == null) return;
+    await _notes.setNote(id, date, note);
+    notifyListeners();
+  }
+
   Future<void> fetchHabits() async {
     _loading = true;
     notifyListeners();
 
     await _completions.init();
+    await _notes.init();
     _habits = await _habitService.fetchHabits();
 
     _loading = false;
@@ -527,6 +543,7 @@ class HomeViewModel extends ChangeNotifier {
     final id = habit.id;
     if (id != null) {
       _completions.clearForHabit(id);
+      _notes.clearForHabit(id);
       _recurrenceHistory.remove(id);
     }
     final result = await _habitService.deleteHabit(habit);
