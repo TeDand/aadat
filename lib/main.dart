@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:aadat/ui/home/widgets/calendar_page.dart';
 import 'package:aadat/ui/home/widgets/habits_page.dart';
 import 'package:aadat/ui/home/widgets/metrics_page.dart';
+import 'package:aadat/ui/home/widgets/resources_page.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -162,6 +163,8 @@ class _RouterState extends State<Router> {
         page = CalendarPage();
       case 3:
         page = MetricsPage();
+      case 4:
+        page = ResourcesPage();
       default:
         page = HomePage();
     }
@@ -195,6 +198,11 @@ class _RouterState extends State<Router> {
             icon: Icon(Icons.insights_outlined),
             selectedIcon: Icon(Icons.insights_rounded),
             label: 'Metrics',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmark_border_outlined),
+            selectedIcon: Icon(Icons.bookmark_rounded),
+            label: 'Resources',
           ),
         ],
       ),
