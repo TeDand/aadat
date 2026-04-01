@@ -1,0 +1,50 @@
+name: Validate Release PR
+
+# Runs on every PR targeting main to enforce that the version is bumped
+# and the in-app changelog is updated before anything ships to users.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versions match (pubspec.yaml ↔ changelog.dart)
+        run: |
+          PUBSPEC=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          DART=$(grep -oP "(?<=kAppVersion = ')[^']+" lib/data/changelog.dart)
+
+          if [ "$PUBSPEC" != "$DART" ]; then
+            echo "❌ Version mismatch:"
+            echo "   pubspec.yaml  → $PUBSPEC"
+            echo "   changelog.dart → $DART"
+            echo ""
+            echo "Run scripts/prepare_release.sh $PUBSPEC to fix."
+            exit 1
+          fi
+          echo "✅ Versions match: $PUBSPEC"
+
+      - name: kChangelog has entry for this version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          if ! grep -q "'$VERSION'" lib/data/changelog.dart; then
+            echo "❌ No kChangelog entry for version $VERSION in lib/data/changelog.dart."
+            echo "   Add one before merging to main."
+            exit 1
+          fi
+          echo "✅ kChangelog entry present for $VERSION"
+
+      - name: Version was actually bumped (vs. base branch)
+        run: |
+          BASE_VERSION=$(git show origin/${{ github.base_ref }}:pubspec.yaml | grep '^version:' | awk '{print $2}' | tr -d '\r')
+          HEAD_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+
+          if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
+            echo "❌ pubspec.yaml version was not bumped (still $HEAD_VERSION)."
+            echo "   Run scripts/prepare_release.sh <new_version> before merging to main."
+            exit 1
+          fi
+          echo "✅ Version bumped: $BASE_VERSION → $HEAD_VERSION"

@@ -1,8 +1,8 @@
-name: Deploy to GitHub Pages
+name: Deploy Dev to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
 
 permissions:
   contents: write
@@ -16,10 +16,10 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      - run: flutter build web --base-href "/aadat/"
+      - run: flutter build web --base-href "/aadat/dev/"
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: build/web
           branch: gh-pages
-          # Preserve the /dev/ subfolder when deploying from main.
-          clean-exclude: dev
+          # Deploy into the /dev/ subfolder, leaving the root (main) untouched.
+          target-folder: dev
