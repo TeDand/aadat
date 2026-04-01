@@ -1,5 +1,6 @@
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/home_page.dart';
+import 'package:aadat/ui/whats_new_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:aadat/ui/home/widgets/calendar_page.dart';
 import 'package:aadat/ui/home/widgets/habits_page.dart';
@@ -150,6 +151,14 @@ class Router extends StatefulWidget {
 
 class _RouterState extends State<Router> {
   var selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) checkAndShowWhatsNew(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,0 +1,38 @@
+name: Create GitHub Release
+
+# Runs after every push to main. If pubspec.yaml's version changed compared
+# to the previous commit, a GitHub Release + tag are created automatically.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # need HEAD and HEAD^ to compare versions
+
+      - name: Read current version
+        id: current
+        run: |
+          echo "version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')" >> $GITHUB_OUTPUT
+
+      - name: Read previous version
+        id: previous
+        run: |
+          echo "version=$(git show HEAD^:pubspec.yaml | grep '^version:' | awk '{print $2}' | tr -d '\r')" >> $GITHUB_OUTPUT
+
+      - name: Create release if version changed
+        if: steps.current.outputs.version != steps.previous.outputs.version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.current.outputs.version }}
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --generate-notes

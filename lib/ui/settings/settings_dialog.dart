@@ -1,8 +1,10 @@
 import 'package:aadat/data/repositories/habit_model.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Explains duplicate title rejection from [HabitService].
 Future<void> showDuplicateHabitNameDialog(BuildContext context) {
@@ -261,6 +263,31 @@ class _AppSettingsDialog extends StatelessWidget {
                   );
                 },
               ),
+              if (kIsWeb) ...[
+                const SizedBox(height: 16),
+                Divider(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+                const SizedBox(height: 12),
+                Text(
+                  'Developer',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Open dev build'),
+                  subtitle: const Text(
+                    'Switch to the dev branch build to test unreleased changes.',
+                  ),
+                  trailing: const Icon(Icons.open_in_new, size: 18),
+                  onTap: () {
+                    final devUri = Uri.base.resolve('dev/');
+                    launchUrl(devUri, webOnlyWindowName: '_self');
+                  },
+                ),
+              ],
             ],
           ),
         ),
