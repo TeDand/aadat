@@ -1,5 +1,7 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class ResourcesPage extends StatelessWidget {
   const ResourcesPage({super.key});
@@ -58,7 +60,7 @@ class ResourcesPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
           Text(
-            'Start here.',
+            'Reading list',
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
@@ -98,7 +100,7 @@ class _ResourceCard extends StatelessWidget {
 
     return Card(
       child: InkWell(
-        onTap: () => _copyUrl(context, resource.url),
+        onTap: () => html.window.open(resource.url, '_blank'),
         borderRadius: BorderRadius.circular(4),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -136,7 +138,7 @@ class _ResourceCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    Icons.link_rounded,
+                    Icons.open_in_new_rounded,
                     size: 14,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -154,7 +156,7 @@ class _ResourceCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'tap to copy',
+                    'tap to open',
                     style: textTheme.labelSmall?.copyWith(
                       color: scheme.outline,
                       fontSize: 10,
@@ -165,25 +167,6 @@ class _ResourceCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _copyUrl(BuildContext context, String url) {
-    Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Link copied',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: Colors.white),
-        ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: const RoundedRectangleBorder(),
-        backgroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
