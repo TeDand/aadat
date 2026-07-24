@@ -4,6 +4,7 @@ import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_dialog.dart';
 import 'habits_list_view.dart';
 import 'habits_page.dart';
+import 'templates_section.dart';
 import 'package:aadat/data/repositories/habit_model.dart';
 
 class HomePage extends StatefulWidget {
@@ -259,6 +260,11 @@ class _HomePageState extends State<HomePage> {
               onPressed: () => _addHabit(viewModel),
               child: const Text('Add Habit'),
             ),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 20),
+            const TemplatesSection(),
+            const SizedBox(height: 80),
           ],
         ),
       ),
