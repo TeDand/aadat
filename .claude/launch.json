@@ -4,8 +4,9 @@
     {
       "name": "Flutter Web",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8080", "--web-hostname", "localhost"],
-      "port": 8080
+      "runtimeArgs": ["run", "--profile", "-d", "web-server", "--web-port", "8080", "--web-hostname", "localhost"],
+      "port": 8080,
+      "cwd": "/Users/anushkakulkarni/Desktop/aadat"
     },
     {
       "name": "Flutter macOS",

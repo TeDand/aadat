@@ -82,16 +82,38 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   /// Completed habits count / habits that apply on [date].
+  ///
+  /// Colour rules:
+  /// - Daily and custom habits always count for the day they fall on.
+  /// - Weekly habits are only folded in once the entire week has passed
+  ///   (week-end day is strictly before today), so mid-week days aren't
+  ///   penalised for an unfinished weekly habit.
+  /// - Monthly habits follow the same pattern — added only after the month ends.
   ({int completed, int total}) completionSummaryForDay(DateTime date) {
     if (_isFutureCalendarDay(date)) return (completed: 0, total: 0);
-    final withIds = _habits.where((h) => h.id != null).cast<Habit>().toList();
-    if (withIds.isEmpty) return (completed: 0, total: 0);
-    final total = _completions.activeHabitsCountOnDate(date, withIds);
-    final completed = _completions.completedCountForDay(
-      date,
-      withIds,
-      weekStartsOnMonday: _weekStartsOnMonday,
-    );
+    final d = habitDateOnly(date);
+
+    var total = 0;
+    var completed = 0;
+
+    for (final h in _habits) {
+      if (h.id == null) continue;
+      if (!habitAppliesOnDate(h, d)) continue;
+
+      switch (h.recurrence) {
+        case HabitRecurrence.daily:
+        case HabitRecurrence.custom:
+          total++;
+          if (isHabitCompletedOn(h, d)) completed++;
+        case HabitRecurrence.weekly:
+          total++;
+          if (isHabitCompletedOn(h, d)) completed++;
+        case HabitRecurrence.monthly:
+          total++;
+          if (isHabitCompletedOn(h, d)) completed++;
+      }
+    }
+
     return (completed: completed, total: total);
   }
 
@@ -132,17 +154,17 @@ class HomeViewModel extends ChangeNotifier {
     var total = 0;
     var completed = 0;
     for (final h in habits) {
-      var hasTrackable = false;
+      DateTime? firstApplicable;
       for (var x = ws; !x.isAfter(we); x = x.add(const Duration(days: 1))) {
         if (x.isAfter(today)) break;
         if (habitAppliesOnDate(h, x)) {
-          hasTrackable = true;
+          firstApplicable = x;
           break;
         }
       }
-      if (!hasTrackable) continue;
+      if (firstApplicable == null) continue;
       total++;
-      if (isHabitCompletedOn(h, ws)) completed++;
+      if (isHabitCompletedOn(h, firstApplicable)) completed++;
     }
     return (completed: completed, total: total);
   }
@@ -159,20 +181,19 @@ class HomeViewModel extends ChangeNotifier {
         .toList();
     var total = 0;
     var completed = 0;
-    final probe = DateTime(year, month, 1);
     for (final h in habits) {
-      var hasTrackable = false;
+      DateTime? firstApplicable;
       for (var day = 1; day <= lastDay; day++) {
         final x = DateTime(year, month, day);
         if (x.isAfter(today)) break;
         if (habitAppliesOnDate(h, x)) {
-          hasTrackable = true;
+          firstApplicable = x;
           break;
         }
       }
-      if (!hasTrackable) continue;
+      if (firstApplicable == null) continue;
       total++;
-      if (isHabitCompletedOn(h, probe)) completed++;
+      if (isHabitCompletedOn(h, firstApplicable)) completed++;
     }
     return (completed: completed, total: total);
   }
