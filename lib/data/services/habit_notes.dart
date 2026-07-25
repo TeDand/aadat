@@ -1,17 +1,15 @@
-import 'dart:convert';
-
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repositories/habit_model.dart';
 
 /// Stores free-text notes keyed by habit id + date.
-/// Storage key: `habit_notes_v1` — JSON-encoded map of String to String
-/// where each map key is `"habitId|yyyy-MM-dd"`.
+/// note_key format: `{habitId}|yyyy-MM-dd`
 class HabitNoteService {
+  final _client = Supabase.instance.client;
   final Map<String, String> _notes = {};
   bool _initialized = false;
 
-  static const _storageKey = 'habit_notes_v1';
+  String get _userId => _client.auth.currentUser!.id;
 
   static String _key(int habitId, DateTime date) {
     final d = habitDateOnly(date);
@@ -23,19 +21,13 @@ class HabitNoteService {
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw != null) {
-      final decoded = json.decode(raw) as Map<String, dynamic>;
-      for (final e in decoded.entries) {
-        _notes[e.key] = e.value as String;
-      }
+    final data = await _client
+        .from('notes')
+        .select('note_key, content')
+        .eq('user_id', _userId);
+    for (final row in data as List<dynamic>) {
+      _notes[row['note_key'] as String] = row['content'] as String;
     }
-  }
-
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, json.encode(_notes));
   }
 
   String? getNote(int habitId, DateTime date) => _notes[_key(habitId, date)];
@@ -44,14 +36,25 @@ class HabitNoteService {
     final k = _key(habitId, date);
     if (note.trim().isEmpty) {
       _notes.remove(k);
+      await _client
+          .from('notes')
+          .delete()
+          .eq('user_id', _userId)
+          .eq('note_key', k);
     } else {
       _notes[k] = note.trim();
+      await _client.from('notes').upsert({
+        'user_id': _userId,
+        'habit_id': habitId,
+        'note_key': k,
+        'content': note.trim(),
+      });
     }
-    await _save();
   }
 
   void clearForHabit(int habitId) {
+    // Only clears in-memory state — the database rows are removed automatically
+    // via the ON DELETE CASCADE on the habits table.
     _notes.removeWhere((k, _) => k.startsWith('$habitId|'));
-    _save();
   }
 }

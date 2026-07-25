@@ -1,47 +1,29 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repositories/habit_model.dart';
 
 /// Tracks completions: daily per day; weekly per week (week start date); monthly per month.
 /// Keys: `d|id|yyyy-MM-dd`, `w|id|yyyy-MM-dd`, `m|id|yyyy-MM`
+///
+/// The in-memory Set is loaded from Supabase on [init] and kept in sync via
+/// fire-and-forget inserts/deletes on [toggle]. The UI is always optimistic —
+/// the in-memory state updates instantly and Supabase syncs in the background.
 class HabitCompletionService {
+  final _client = Supabase.instance.client;
   final Set<String> _keys = {};
   bool _initialized = false;
 
-  HabitCompletionService();
+  String get _userId => _client.auth.currentUser!.id;
 
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getStringList('completions_v1') ?? [];
-    _keys.addAll(saved);
-    _migrateLegacyKeys();
-  }
-
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('completions_v1', _keys.toList());
-  }
-
-  void _migrateLegacyKeys() {
-    final toRemove = <String>[];
-    final toAdd = <String>[];
-    for (final k in _keys) {
-      final parts = k.split('|');
-      if (parts.length == 2) {
-        final id = int.tryParse(parts[0]);
-        if (id != null && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(parts[1])) {
-          toRemove.add(k);
-          toAdd.add('d|$id|${parts[1]}');
-        }
-      }
-    }
-    for (final k in toRemove) {
-      _keys.remove(k);
-    }
-    for (final k in toAdd) {
-      _keys.add(k);
+    final data = await _client
+        .from('completions')
+        .select('completion_key')
+        .eq('user_id', _userId);
+    for (final row in data as List<dynamic>) {
+      _keys.add(row['completion_key'] as String);
     }
   }
 
@@ -80,10 +62,8 @@ class HabitCompletionService {
 
   /// Toggle completion for [habit] on [date]. Weekly/monthly flip a whole week/month.
   ///
-  /// When the habit is currently completed (via *any* recurrence key type — this
-  /// handles habits whose recurrence was changed after completions were recorded),
-  /// ALL key types for that period are cleared so the habit shows as not-done.
-  /// When not completed, a key is added under the *current* recurrence type only.
+  /// Updates the in-memory Set immediately (so the UI responds instantly), then
+  /// syncs the change to Supabase in the background.
   void toggle(
     Habit habit,
     DateTime date, {
@@ -101,27 +81,47 @@ class HabitCompletionService {
     final ws = weekStartForDate(d, weekStartsOnMonday: weekStartsOnMonday);
 
     if (isCompleted(habit, date, weekStartsOnMonday: weekStartsOnMonday)) {
-      // Remove across all types so legacy keys from a previous recurrence are
-      // also cleared, preventing a "stuck completed" state after recurrence change.
-      _keys.remove('d|$id|${_dateKey(d)}');
-      _keys.remove('w|$id|${_dateKey(ws)}');
-      _keys.remove('m|$id|${_monthPayload(d.year, d.month)}');
+      final keysToRemove = [
+        'd|$id|${_dateKey(d)}',
+        'w|$id|${_dateKey(ws)}',
+        'm|$id|${_monthPayload(d.year, d.month)}',
+      ];
+      for (final k in keysToRemove) {
+        _keys.remove(k);
+      }
+      _deleteKeys(keysToRemove);
     } else {
+      String key;
       switch (habit.recurrence) {
         case HabitRecurrence.daily:
-          _keys.add('d|$id|${_dateKey(d)}');
+        case HabitRecurrence.custom:
+          key = 'd|$id|${_dateKey(d)}';
         case HabitRecurrence.weekly:
           if (!_weekHasAnyTrackableDay(ws, today, start)) return;
-          _keys.add('w|$id|${_dateKey(ws)}');
+          key = 'w|$id|${_dateKey(ws)}';
         case HabitRecurrence.monthly:
           if (!_monthHasAnyTrackableDay(d.year, d.month, today, start)) return;
-          _keys.add('m|$id|${_monthPayload(d.year, d.month)}');
-        case HabitRecurrence.custom:
-          // Custom habits are tracked per individual day, just like daily.
-          _keys.add('d|$id|${_dateKey(d)}');
+          key = 'm|$id|${_monthPayload(d.year, d.month)}';
       }
+      _keys.add(key);
+      _insertKey(key, id);
     }
-    _save();
+  }
+
+  Future<void> _insertKey(String key, int habitId) async {
+    await _client.from('completions').insert({
+      'user_id': _userId,
+      'habit_id': habitId,
+      'completion_key': key,
+    });
+  }
+
+  Future<void> _deleteKeys(List<String> keys) async {
+    await _client
+        .from('completions')
+        .delete()
+        .eq('user_id', _userId)
+        .inFilter('completion_key', keys);
   }
 
   bool _weekHasAnyTrackableDay(
@@ -155,6 +155,8 @@ class HabitCompletionService {
   }
 
   void clearForHabit(int habitId) {
+    // Only clears in-memory state — the database rows are removed automatically
+    // via the ON DELETE CASCADE on the habits table.
     _keys.removeWhere((k) {
       final parts = k.split('|');
       return parts.length == 3 && parts[1] == '$habitId';

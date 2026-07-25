@@ -24,9 +24,13 @@ Future<void> showDuplicateHabitNameDialog(BuildContext context) {
 }
 
 Future<void> showAppSettingsDialog(BuildContext context) {
+  final homeViewModel = context.read<HomeViewModel>();
   return showDialog<void>(
     context: context,
-    builder: (ctx) => const _AppSettingsDialog(),
+    builder: (ctx) => ChangeNotifierProvider.value(
+      value: homeViewModel,
+      child: const _AppSettingsDialog(),
+    ),
   );
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_dialog.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'habits_list_view.dart';
 import 'habits_page.dart';
 import 'templates_section.dart';
@@ -117,6 +118,11 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => showAppSettingsDialog(context),
           ),
+          IconButton(
+            tooltip: 'Sign Out',
+            icon: const Icon(Icons.logout),
+            onPressed: () => Supabase.instance.client.auth.signOut(),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -124,6 +130,17 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (viewModel.message != null && viewModel.message!.startsWith('Error')) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: Text(
+                  viewModel.message!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                ),
+              ),
+            ],
             if (viewModel.urgentHabits.isNotEmpty)
               _UrgencyBanner(urgent: viewModel.urgentHabits),
             if (viewModel.urgentHabits.isNotEmpty) const SizedBox(height: 16),

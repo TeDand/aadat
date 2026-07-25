@@ -481,9 +481,13 @@ class HomeViewModel extends ChangeNotifier {
     _loading = true;
     notifyListeners();
 
-    await _completions.init();
-    await _notes.init();
-    _habits = await _habitService.fetchHabits();
+    try {
+      await _completions.init();
+      await _notes.init();
+      _habits = await _habitService.fetchHabits();
+    } catch (e) {
+      _message = 'Failed to load habits. Check your connection and database setup.';
+    }
 
     _loading = false;
     notifyListeners();
@@ -537,27 +541,32 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Returns the service message (e.g. `habit added!`, `habit already exists!`).
   Future<String> addHabit(Habit habit) async {
-    final withCat = habit.copy(category: _canonicalCategory(habit.category));
-    final result = await _habitService.addHabit(withCat);
-    if (result == 'habit added!') {
-      _setMessage(result);
-      await fetchHabits();
-      // Record initial recurrence starting from the habit's start date (or today).
-      final added = _habits.firstWhere(
-        (h) => h.title.toLowerCase() == withCat.title.toLowerCase() && h.id != null,
-        orElse: () => withCat,
-      );
-      if (added.id != null) {
-        final since = added.startDate ?? habitDateOnly(DateTime.now());
-        _recordRecurrence(added.id!, added.recurrence, since);
+    try {
+      final withCat = habit.copy(category: _canonicalCategory(habit.category));
+      final result = await _habitService.addHabit(withCat);
+      if (result == 'habit added!') {
+        _setMessage(result);
+        await fetchHabits();
+        final added = _habits.firstWhere(
+          (h) => h.title.toLowerCase() == withCat.title.toLowerCase() && h.id != null,
+          orElse: () => withCat,
+        );
+        if (added.id != null) {
+          final since = added.startDate ?? habitDateOnly(DateTime.now());
+          _recordRecurrence(added.id!, added.recurrence, since);
+        }
+      } else if (result != 'habit already exists!') {
+        _setMessage(result);
+        await fetchHabits();
+      } else {
+        await fetchHabits();
       }
-    } else if (result != 'habit already exists!') {
-      _setMessage(result);
-      await fetchHabits();
-    } else {
-      await fetchHabits();
+      return result;
+    } catch (e) {
+      _setMessage('Error: $e');
+      notifyListeners();
+      return 'error: $e';
     }
-    return result;
   }
 
   Future<void> deleteHabit(Habit habit) async {
