@@ -217,11 +217,15 @@ class _TemplateTile extends StatelessWidget {
   }
 
   void _showSheet(BuildContext context) {
+    final homeViewModel = context.read<HomeViewModel>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(),
-      builder: (ctx) => _TemplateSheet(template: template),
+      builder: (ctx) => ChangeNotifierProvider.value(
+        value: homeViewModel,
+        child: _TemplateSheet(template: template),
+      ),
     );
   }
 }

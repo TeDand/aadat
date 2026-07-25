@@ -21,11 +21,14 @@ void showAddHabitSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (BuildContext context) {
-      return _HabitEditorSheet(
-        habit: draft,
-        isNew: true,
-        onCommit: (updated) => homeViewModel.addHabit(updated),
+    builder: (BuildContext ctx) {
+      return ChangeNotifierProvider.value(
+        value: homeViewModel,
+        child: _HabitEditorSheet(
+          habit: draft,
+          isNew: true,
+          onCommit: (updated) => homeViewModel.addHabit(updated),
+        ),
       );
     },
   );
@@ -54,11 +57,14 @@ class _HabitsListViewState extends State<HabitsListView> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (BuildContext context) {
-        return _HabitEditorSheet(
-          habit: habit,
-          isNew: false,
-          onCommit: (updated) => homeViewModel.updateHabit(updated),
+      builder: (BuildContext ctx) {
+        return ChangeNotifierProvider.value(
+          value: homeViewModel,
+          child: _HabitEditorSheet(
+            habit: habit,
+            isNew: false,
+            onCommit: (updated) => homeViewModel.updateHabit(updated),
+          ),
         );
       },
     );

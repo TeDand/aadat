@@ -1,3 +1,5 @@
+import 'package:aadat/core/supabase_config.dart';
+import 'package:aadat/ui/auth/login_page.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/home_page.dart';
 import 'package:flutter/material.dart';
@@ -8,14 +10,14 @@ import 'package:aadat/ui/home/widgets/resources_page.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => HomeViewModel()),
-        ChangeNotifierProvider(create: (_) => SettingsViewModel()),
-      ],
+    ChangeNotifierProvider(
+      create: (_) => SettingsViewModel(),
       child: const MainApp(),
     ),
   );
@@ -136,19 +138,40 @@ class MainApp extends StatelessWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const Router(),
+      home: const AuthGate(),
     );
   }
 }
 
-class Router extends StatefulWidget {
-  const Router({super.key});
+/// Listens to Supabase auth state and routes to [LoginPage] or [AppShell].
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
 
   @override
-  State<Router> createState() => _RouterState();
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Scaffold(body: SizedBox.shrink());
+        final session = snapshot.data!.session;
+        if (session == null) return const LoginPage();
+        return ChangeNotifierProvider(
+          create: (_) => HomeViewModel(),
+          child: const AppShell(),
+        );
+      },
+    );
+  }
 }
 
-class _RouterState extends State<Router> {
+class AppShell extends StatefulWidget {
+  const AppShell({super.key});
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
   var selectedIndex = 0;
 
   @override
