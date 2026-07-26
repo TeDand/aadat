@@ -1,7 +1,9 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ResourcesPage extends StatelessWidget {
   const ResourcesPage({super.key});
@@ -100,7 +102,13 @@ class _ResourceCard extends StatelessWidget {
 
     return Card(
       child: InkWell(
-        onTap: () => html.window.open(resource.url, '_blank'),
+        onTap: () {
+          if (kIsWeb) {
+            html.window.open(resource.url, '_blank');
+          } else {
+            launchUrl(Uri.parse(resource.url), mode: LaunchMode.externalApplication);
+          }
+        },
         borderRadius: BorderRadius.circular(4),
         child: Padding(
           padding: const EdgeInsets.all(16),
