@@ -66,6 +66,76 @@ create policy "users manage own notes"
   using  (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- ─── Profiles ──────────────────────────────────────────────────────────────
+-- Auto-created on signup via trigger below. Used for friend lookups by email.
+
+create table public.profiles (
+  id           uuid  primary key references auth.users(id) on delete cascade,
+  email        text  not null,
+  display_name text,
+  created_at   timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+
+create policy "authenticated users can read profiles"
+  on public.profiles for select
+  using (auth.role() = 'authenticated');
+
+create policy "users update own profile"
+  on public.profiles for update
+  using (auth.uid() = id);
+
+grant select, update on public.profiles to authenticated;
+
+-- Trigger: create profile row when a new user signs up
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, display_name)
+  values (new.id, new.email, new.raw_user_meta_data->>'display_name')
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- ─── Friendships ───────────────────────────────────────────────────────────
+
+create table public.friendships (
+  id           bigserial    primary key,
+  requester_id uuid         not null references auth.users(id) on delete cascade,
+  addressee_id uuid         not null references auth.users(id) on delete cascade,
+  status       text         not null default 'pending',  -- 'pending' | 'accepted'
+  created_at   timestamptz  not null default now(),
+  unique (requester_id, addressee_id),
+  check (requester_id <> addressee_id)
+);
+
+alter table public.friendships enable row level security;
+
+create policy "users see their own friendships"
+  on public.friendships for select
+  using (auth.uid() = requester_id or auth.uid() = addressee_id);
+
+create policy "users send requests as requester"
+  on public.friendships for insert
+  with check (auth.uid() = requester_id);
+
+create policy "addressee can accept"
+  on public.friendships for update
+  using (auth.uid() = addressee_id);
+
+create policy "either party can remove"
+  on public.friendships for delete
+  using (auth.uid() = requester_id or auth.uid() = addressee_id);
+
+grant select, insert, update, delete on public.friendships to authenticated;
+grant usage, select on sequence public.friendships_id_seq to authenticated;
+
 -- ─── Grants ────────────────────────────────────────────────────────────────
 -- RLS policies filter rows, but the authenticated role also needs base table
 -- privileges or Postgres will deny the request before RLS even runs.

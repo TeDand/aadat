@@ -43,6 +43,7 @@ class HomePage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final today = habitDateOnly(DateTime.now());
     final summary = viewModel.completionSummaryForDay(today);
+    final urgent = viewModel.urgentHabits;
     final name = _displayName();
 
     return Scaffold(
@@ -142,6 +143,10 @@ class HomePage extends StatelessWidget {
                     minHeight: 2,
                   ),
                 ],
+                if (urgent.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _DeadlineWarnings(urgent: urgent, scheme: scheme, textTheme: textTheme),
+                ],
                 const SizedBox(height: 10),
                 Text(
                   'Tap to see your stats',
@@ -192,6 +197,55 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DeadlineWarnings extends StatelessWidget {
+  const _DeadlineWarnings({
+    required this.urgent,
+    required this.scheme,
+    required this.textTheme,
+  });
+
+  final List<({Habit habit, String reason})> urgent;
+  final ColorScheme scheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    // Group by reason prefix (Daily / Weekly / Monthly / Custom).
+    final counts = <String, int>{};
+    for (final u in urgent) {
+      final tag = u.reason.split(' — ').first; // e.g. "Daily", "Weekly"
+      final suffix = u.reason.split(' — ').last; // e.g. "under 2h left"
+      counts['$tag — $suffix'] = (counts['$tag — $suffix'] ?? 0) + 1;
+    }
+
+    final warningColor = scheme.error;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 1, color: scheme.outlineVariant),
+        const SizedBox(height: 8),
+        for (final entry in counts.entries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: warningColor),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${entry.value} habit${entry.value == 1 ? '' : 's'} — ${entry.key}',
+                    style: textTheme.bodySmall?.copyWith(color: warningColor),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

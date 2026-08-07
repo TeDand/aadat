@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/notification_service.dart';
 import '../../../data/repositories/habit_model.dart';
 import '../../../data/services/habit_completions.dart';
 import '../../../data/services/habit_notes.dart';
@@ -426,6 +427,11 @@ class HomeViewModel extends ChangeNotifier {
               : '$daysLeft day${daysLeft == 1 ? '' : 's'} left in month';
           result.add((habit: h, reason: 'Monthly — $label'));
         }
+      } else if (h.recurrence == HabitRecurrence.daily) {
+        // Warn after 22:00 if daily habit is still incomplete today.
+        if (DateTime.now().hour >= 22 && !isHabitCompletedOn(h, today)) {
+          result.add((habit: h, reason: 'Daily — under 2h left'));
+        }
       } else if (h.recurrence == HabitRecurrence.custom) {
         // Urgent if ≤2 days remain in the week and any scheduled day this week
         // is still pending.
@@ -462,6 +468,79 @@ class HomeViewModel extends ChangeNotifier {
       weekStartsOnMonday: _weekStartsOnMonday,
     );
     notifyListeners();
+    _checkMilestonesAndReschedule(habit, date);
+  }
+
+  void _checkMilestonesAndReschedule(Habit habit, DateTime date) {
+    final today = habitDateOnly(DateTime.now());
+
+    // Only fire milestones when marking something complete (not un-checking).
+    if (!isHabitCompletedOn(habit, date)) return;
+
+    final streaks = streaksForHabit(habit);
+
+    if (streaks.current == 7) {
+      NotificationService.showMilestone(
+        '🔥 7-day streak!',
+        'You\'ve completed "${habit.title}" 7 days in a row.',
+      );
+    } else if (streaks.current > 0 && streaks.current % 30 == 0) {
+      NotificationService.showMilestone(
+        '🏆 ${streaks.current}-day streak!',
+        'Amazing — "${habit.title}" every day for ${streaks.current} days.',
+      );
+    }
+
+    // Perfect day: all daily/custom habits done
+    if (habit.recurrence == HabitRecurrence.daily ||
+        habit.recurrence == HabitRecurrence.custom) {
+      final daily = completionSummaryForDayForRecurrence(today, HabitRecurrence.daily);
+      final custom = completionSummaryForDayForRecurrence(today, HabitRecurrence.custom);
+      final totalDone = daily.completed + custom.completed;
+      final totalAll = daily.total + custom.total;
+      if (totalAll > 0 && totalDone == totalAll) {
+        NotificationService.showMilestone(
+          '🎉 Perfect day!',
+          'All $totalAll daily habits complete.',
+        );
+      }
+    }
+
+    // Perfect week: all weekly habits done this week
+    if (habit.recurrence == HabitRecurrence.weekly) {
+      final weekly = weeklySummaryForWeekContaining(today);
+      if (weekly.total > 0 && weekly.completed == weekly.total) {
+        NotificationService.showMilestone(
+          '✅ Perfect week!',
+          'All ${weekly.total} weekly habits complete.',
+        );
+      }
+    }
+
+    // Perfect month: all monthly habits done this month
+    if (habit.recurrence == HabitRecurrence.monthly) {
+      final monthly = monthlySummaryForMonth(today.year, today.month);
+      if (monthly.total > 0 && monthly.completed == monthly.total) {
+        NotificationService.showMilestone(
+          '🏅 Perfect month!',
+          'All ${monthly.total} monthly habits complete.',
+        );
+      }
+    }
+
+    _scheduleDeadlineReminders();
+  }
+
+  void _scheduleDeadlineReminders() {
+    final today = habitDateOnly(DateTime.now());
+    final dailySummary = completionSummaryForDayForRecurrence(today, HabitRecurrence.daily);
+    final weeklySummary = weeklySummaryForWeekContaining(today);
+    final monthlySummary = monthlySummaryForMonth(today.year, today.month);
+    NotificationService.rescheduleDeadlineReminders(
+      daily: dailySummary.total - dailySummary.completed,
+      weekly: weeklySummary.total - weeklySummary.completed,
+      monthly: monthlySummary.total - monthlySummary.completed,
+    );
   }
 
   String? noteForHabit(Habit habit, DateTime date) {
@@ -491,6 +570,7 @@ class HomeViewModel extends ChangeNotifier {
 
     _loading = false;
     notifyListeners();
+    _scheduleDeadlineReminders();
   }
 
   // ── Recurrence history ───────────────────────────────────────────────────

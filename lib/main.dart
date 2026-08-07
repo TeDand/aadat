@@ -1,5 +1,7 @@
+import 'package:aadat/core/notification_service.dart';
 import 'package:aadat/core/supabase_config.dart';
 import 'package:aadat/ui/auth/login_page.dart';
+import 'package:aadat/ui/friends/widgets/friends_page.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/calendar_page.dart';
 import 'package:aadat/ui/home/widgets/habits_page.dart';
@@ -13,6 +15,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
+  await NotificationService.init();
+  await NotificationService.requestPermissions();
   runApp(
     ChangeNotifierProvider(
       create: (_) => SettingsViewModel(),
@@ -180,6 +184,8 @@ class _AppShellState extends State<AppShell> {
         page = const HabitsPage();
       case 2:
         page = const CalendarPage();
+      case 3:
+        page = const FriendsPage();
       default:
         page = const HomePage();
     }
@@ -204,6 +210,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Calendar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Friends',
           ),
         ],
       ),
