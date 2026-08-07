@@ -1,114 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_dialog.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'habits_list_view.dart';
-import 'habits_page.dart';
-import 'ai_suggestions_section.dart';
-import 'templates_section.dart';
 import 'package:aadat/data/repositories/habit_model.dart';
+import 'metrics_page.dart';
+import 'templates_page.dart';
+import 'resources_page.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _titleFocus = FocusNode();
-  final _descFocus = FocusNode();
-  final _categoryFocus = FocusNode();
-  HabitRecurrence _recurrence = HabitRecurrence.daily;
-  Set<int> _customDays = {};
-  late DateTime _startDate;
-
-  @override
-  void initState() {
-    super.initState();
-    _startDate = habitDateOnly(DateTime.now());
+  String _salutation() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    _categoryController.dispose();
-    _titleFocus.dispose();
-    _descFocus.dispose();
-    _categoryFocus.dispose();
-    super.dispose();
+  String _displayName() {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user?.userMetadata?['display_name'] as String? ?? '';
   }
 
-  Future<void> _addHabit(HomeViewModel viewModel) async {
-    if (_titleController.text.trim().isEmpty) return;
-    var recurrence = _recurrence;
-    List<int> customDays = [];
-    if (_recurrence == HabitRecurrence.custom) {
-      if (_customDays.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Select at least one day.')),
-        );
-        return;
-      }
-      if (_customDays.length == 7) {
-        recurrence = HabitRecurrence.daily;
-      } else if (_customDays.length == 1) {
-        recurrence = HabitRecurrence.weekly;
-      } else {
-        customDays = _customDays.toList()..sort();
-      }
-    }
-    final newHabit = Habit(
-      title: _titleController.text.trim(),
-      description: _descController.text.trim(),
-      category: _categoryController.text.trim(),
-      recurrence: recurrence,
-      customDays: customDays,
-      startDate: _startDate,
-    );
-    final r = await viewModel.addHabit(newHabit);
-    if (!mounted) return;
-    if (r == 'habit already exists!') {
-      await showDuplicateHabitNameDialog(context);
-      return;
-    }
-    if (r != 'habit added!') return;
-    _titleController.clear();
-    _descController.clear();
-    _categoryController.clear();
-    setState(() {
-      _recurrence = HabitRecurrence.daily;
-      _customDays = {};
-      _startDate = habitDateOnly(DateTime.now());
-    });
-    _showAddedToast(context);
-  }
-
-  void _showAddedToast(BuildContext context) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => _FadeToast(
-        message: '// habit added',
-        onDone: () => entry.remove(),
-      ),
-    );
-    overlay.insert(entry);
+  String _dateLabel() {
+    final now = DateTime.now();
+    const days = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday',
+    ];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
   }
 
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<HomeViewModel>();
-    final categorySuggestions = viewModel.categorySuggestions;
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final today = habitDateOnly(DateTime.now());
+    final summary = viewModel.completionSummaryForDay(today);
+    final name = _displayName();
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
+      endDrawer: const _AppMenuDrawer(),
       appBar: AppBar(
         title: _AadatWordmark(foreground: scheme.onPrimary),
         backgroundColor: scheme.primary,
@@ -119,244 +58,242 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => showAppSettingsDialog(context),
           ),
-          IconButton(
-            tooltip: 'Sign Out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => Supabase.instance.client.auth.signOut(),
+          Builder(
+            builder: (ctx) => IconButton(
+              tooltip: 'Menu',
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(ctx).openEndDrawer(),
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (viewModel.message != null && viewModel.message!.startsWith('Error')) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: Text(
-                  viewModel.message!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-                ),
-              ),
-            ],
-            if (viewModel.urgentHabits.isNotEmpty)
-              _UrgencyBanner(urgent: viewModel.urgentHabits),
-            if (viewModel.urgentHabits.isNotEmpty) const SizedBox(height: 16),
-            TextField(
-              controller: _titleController,
-              focusNode: _titleFocus,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: "Habit title",
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (_) => _descFocus.requestFocus(),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descController,
-              focusNode: _descFocus,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: "Description",
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-              onSubmitted: (_) => _categoryFocus.requestFocus(),
-            ),
-            const SizedBox(height: 12),
-            RawAutocomplete<String>(
-              textEditingController: _categoryController,
-              focusNode: _categoryFocus,
-              optionsBuilder: (textEditingValue) {
-                final q = textEditingValue.text.toLowerCase();
-                if (textEditingValue.text.isEmpty) return categorySuggestions;
-                return categorySuggestions
-                    .where((s) => s.toLowerCase().contains(q))
-                    .take(12);
-              },
-              displayStringForOption: (s) => s,
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    hintText: 'e.g. Health, Work (optional)',
-                    border: OutlineInputBorder(),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
+        children: [
+          Text(
+            '${_salutation()}${name.isNotEmpty ? ', $name' : ''}',
+            style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _dateLabel(),
+            style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 28),
+          _TappableCard(
+            onTap: () {
+              final vm = context.read<HomeViewModel>();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider.value(
+                    value: vm,
+                    child: const MetricsPage(),
                   ),
-                  onSubmitted: (_) {},
-                );
-              },
-              optionsViewBuilder: (context, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    elevation: 4,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 200),
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        itemCount: options.length,
-                        itemBuilder: (context, index) {
-                          final opt = options.elementAt(index);
-                          return ListTile(
-                            dense: true,
-                            title: Text(opt),
-                            onTap: () => onSelected(opt),
-                          );
-                        },
+                ),
+              );
+            },
+            scheme: scheme,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "Today's habits",
+                      style: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Recurrence',
-                border: OutlineInputBorder(),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<HabitRecurrence>(
-                  isExpanded: true,
-                  value: _recurrence,
-                  items: HabitRecurrence.values
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e,
-                          child: Text(e.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _recurrence = v);
-                  },
+                    const Spacer(),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${summary.completed}',
+                        style: textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' / ${summary.total}',
+                        style: textTheme.headlineMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (summary.total > 0) ...[
+                  const SizedBox(height: 14),
+                  LinearProgressIndicator(
+                    value: summary.completed / summary.total,
+                    backgroundColor: scheme.outlineVariant,
+                    color: scheme.primary,
+                    minHeight: 2,
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Text(
+                  'Tap to see your stats',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            if (_recurrence == HabitRecurrence.custom) ...[
-              const SizedBox(height: 12),
-              DayPicker(
-                selectedDays: _customDays,
-                onChanged: (days) => setState(() => _customDays = days),
-              ),
-            ],
-            const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Start date'),
-              subtitle: Text(
-                '${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}',
-              ),
-              trailing: TextButton(
-                onPressed: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _startDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setState(() => _startDate = habitDateOnly(picked));
-                  }
-                },
-                child: const Text('Change'),
-              ),
+          ),
+          const SizedBox(height: 12),
+          _TappableCard(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TemplatesPage()),
             ),
-            const SizedBox(height: 16),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: () => _addHabit(viewModel),
-              child: const Text('Add Habit'),
+            scheme: scheme,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Not sure where to start?',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Browse habit templates and resources',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 11,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
-            const Divider(),
-            const SizedBox(height: 20),
-            const AiSuggestionsSection(),
-            const SizedBox(height: 20),
-            const Divider(),
-            const SizedBox(height: 20),
-            const TemplatesSection(),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChangeNotifierProvider.value(
-                value: context.read<HomeViewModel>(),
-                child: const HabitsPage(),
-              ),
-            ),
-          );
-        },
-        icon: const Icon(Icons.list),
-        label: const Text("View All Habits"),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _UrgencyBanner extends StatelessWidget {
-  const _UrgencyBanner({required this.urgent});
+class _TappableCard extends StatelessWidget {
+  const _TappableCard({
+    required this.onTap,
+    required this.scheme,
+    required this.child,
+  });
 
-  final List<({Habit habit, String reason})> urgent;
+  final VoidCallback onTap;
+  final ColorScheme scheme;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange.shade700, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                'Approaching deadlines',
-                style: textTheme.titleSmall?.copyWith(
-                  color: Colors.orange.shade900,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (final u in urgent)
-            Text(
-              '• ${u.habit.title} — ${u.reason}',
-              style: textTheme.bodySmall
-                  ?.copyWith(color: Colors.orange.shade900),
-            ),
-        ],
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: child,
       ),
     );
   }
 }
 
-/// Stylized logotype for the home app bar.
+class _AppMenuDrawer extends StatelessWidget {
+  const _AppMenuDrawer();
+
+  void _go(BuildContext context, Widget page, {HomeViewModel? vm}) {
+    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => vm != null
+            ? ChangeNotifierProvider.value(value: vm, child: page)
+            : page,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Text(
+                'menu',
+                style: textTheme.bodySmall?.copyWith(
+                  letterSpacing: 3,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Divider(color: scheme.outlineVariant),
+            ListTile(
+              leading: const Icon(Icons.insights_outlined),
+              title: const Text('Stats'),
+              onTap: () {
+                final vm = context.read<HomeViewModel>();
+                _go(context, const MetricsPage(), vm: vm);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome_outlined),
+              title: const Text('Templates'),
+              onTap: () => _go(context, const TemplatesPage()),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bookmark_outline),
+              title: const Text('Resources'),
+              onTap: () => _go(context, const ResourcesPage()),
+            ),
+            const Spacer(),
+            Divider(color: scheme.outlineVariant),
+            ListTile(
+              leading: Icon(Icons.logout, color: scheme.onSurfaceVariant),
+              title: Text(
+                'Sign out',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              onTap: () => Supabase.instance.client.auth.signOut(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AadatWordmark extends StatelessWidget {
   const _AadatWordmark({required this.foreground});
 
@@ -387,89 +324,6 @@ class _AadatWordmark extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FadeToast extends StatefulWidget {
-  const _FadeToast({required this.message, required this.onDone});
-
-  final String message;
-  final VoidCallback onDone;
-
-  @override
-  State<_FadeToast> createState() => _FadeToastState();
-}
-
-class _FadeToastState extends State<_FadeToast>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _opacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _ctrl.forward().then((_) async {
-      await Future.delayed(const Duration(milliseconds: 1400));
-      if (mounted) await _ctrl.reverse();
-      widget.onDone();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Positioned(
-      bottom: 32,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: FadeTransition(
-          opacity: _opacity,
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: scheme.inverseSurface,
-              border: Border.all(
-                color: const Color(0xFF2E7D32).withValues(alpha: 0.6),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.check,
-                  color: Color(0xFF2E7D32),
-                  size: 13,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.message,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onInverseSurface,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
     );
   }
 }

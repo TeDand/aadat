@@ -9,8 +9,10 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
@@ -21,8 +23,10 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _nameFocus.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
     super.dispose();
@@ -44,9 +48,11 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       if (_isSignUp) {
+        final name = _nameController.text.trim();
         final response = await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
+          data: name.isNotEmpty ? {'display_name': name} : {},
         );
         // No session means email confirmation is required before sign-in works.
         if (response.session == null && mounted) {
@@ -143,6 +149,20 @@ class _LoginPageState extends State<LoginPage> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
+        if (_isSignUp) ...[
+          TextField(
+            controller: _nameController,
+            focusNode: _nameFocus,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Name (optional)',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _emailFocus.requestFocus(),
+          ),
+          const SizedBox(height: 12),
+        ],
         TextField(
           controller: _emailController,
           focusNode: _emailFocus,

@@ -65,7 +65,7 @@ class _AiSuggestionsSectionState extends State<AiSuggestionsSection> {
             Icon(Icons.auto_awesome_outlined, size: 16, color: scheme.primary),
             const SizedBox(width: 6),
             Text(
-              'AI suggestions',
+              'Tell AI your goals!',
               style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],

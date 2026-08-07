@@ -1,8 +1,10 @@
+import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/home/widgets/habits_list_view.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'templates_page.dart';
 
 class HabitsPage extends StatelessWidget {
   const HabitsPage({super.key});
@@ -19,16 +21,70 @@ class HabitsPage extends StatelessWidget {
           child: Divider(height: 1, color: scheme.outlineVariant),
         ),
       ),
-      body: const HabitsListView(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final settings = context.read<SettingsViewModel>();
-          if (settings.useHaptics) {
-            HapticFeedback.lightImpact();
-          }
-          showAddHabitSheet(context);
-        },
-        child: const Icon(Icons.add),
+      body: Column(
+        children: [
+          const Expanded(child: HabitsListView()),
+          _HabitsFooter(),
+        ],
+      ),
+    );
+  }
+}
+
+class _HabitsFooter extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final settings = context.read<SettingsViewModel>();
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+        color: scheme.surfaceContainerLowest,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        12 + MediaQuery.of(context).padding.bottom,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: () {
+                if (settings.useHaptics) HapticFeedback.lightImpact();
+                showAddHabitSheet(context);
+              },
+              child: const Text('Add habit'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(color: scheme.outlineVariant),
+              ),
+              onPressed: () {
+                final vm = context.read<HomeViewModel>();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: vm,
+                      child: const TemplatesPage(),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Templates'),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Explains duplicate title rejection from [HabitService].
 Future<void> showDuplicateHabitNameDialog(BuildContext context) {
@@ -57,6 +58,18 @@ class _AppSettingsDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text(
+                'Your profile',
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const _ProfileSection(),
+              const SizedBox(height: 16),
+              Divider(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+              const SizedBox(height: 12),
               Text(
                 'Appearance',
                 style: textTheme.titleSmall?.copyWith(
@@ -273,6 +286,107 @@ class _AppSettingsDialog extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Done'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileSection extends StatefulWidget {
+  const _ProfileSection();
+
+  @override
+  State<_ProfileSection> createState() => _ProfileSectionState();
+}
+
+class _ProfileSectionState extends State<_ProfileSection> {
+  late final TextEditingController _nameController;
+  bool _saving = false;
+  String? _feedback;
+
+  @override
+  void initState() {
+    super.initState();
+    final current = Supabase.instance.client.auth.currentUser
+            ?.userMetadata?['display_name'] as String? ??
+        '';
+    _nameController = TextEditingController(text: current);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    setState(() {
+      _saving = true;
+      _feedback = null;
+    });
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {'display_name': name}),
+      );
+      if (mounted) setState(() => _feedback = 'Saved.');
+    } catch (_) {
+      if (mounted) setState(() => _feedback = 'Could not save. Try again.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _nameController,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Display name',
+            hintText: 'How should we greet you?',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) {
+            if (_feedback != null) setState(() => _feedback = null);
+          },
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            if (_feedback != null)
+              Expanded(
+                child: Text(
+                  _feedback!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: _feedback == 'Saved.'
+                        ? scheme.primary
+                        : scheme.error,
+                  ),
+                ),
+              )
+            else
+              const Spacer(),
+            TextButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
+                    )
+                  : const Text('Save'),
+            ),
+          ],
         ),
       ],
     );

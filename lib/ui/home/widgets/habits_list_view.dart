@@ -4,6 +4,7 @@ import 'package:aadat/ui/settings/settings_dialog.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'ai_suggestions_section.dart';
 
 /// Opens the same editor as habit details, for creating a habit with a suggested title.
 void showAddHabitSheet(BuildContext context) {
@@ -80,10 +81,33 @@ class _HabitsListViewState extends State<HabitsListView> {
 
     return CustomScrollView(
       slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const AiSuggestionsSection(),
+                const SizedBox(height: 20),
+                const Divider(),
+              ],
+            ),
+          ),
+        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           sliver: SliverToBoxAdapter(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your habits',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
               children: [
                 Text(
                   'Group by',
@@ -108,6 +132,8 @@ class _HabitsListViewState extends State<HabitsListView> {
                     ),
                   ],
                 ),
+              ],
+            ),
               ],
             ),
           ),
