@@ -130,6 +130,19 @@ final habitTemplates = [
   ),
 ];
 
+void showTemplateSheet(BuildContext context, HabitTemplate template) {
+  final homeViewModel = context.read<HomeViewModel>();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(),
+    builder: (ctx) => ChangeNotifierProvider.value(
+      value: homeViewModel,
+      child: _TemplateSheet(template: template),
+    ),
+  );
+}
+
 /// Compact section widget for the Home page.
 class TemplatesSection extends StatelessWidget {
   const TemplatesSection({super.key});
@@ -148,8 +161,7 @@ class TemplatesSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Try a template based on popular habit-building techniques. '
-          'See the Resources tab for further reading.',
+          'Try a template based on popular habit-building techniques.',
           style: textTheme.bodySmall?.copyWith(
             color: scheme.onSurfaceVariant,
             height: 1.5,
@@ -216,18 +228,7 @@ class _TemplateTile extends StatelessWidget {
     );
   }
 
-  void _showSheet(BuildContext context) {
-    final homeViewModel = context.read<HomeViewModel>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(),
-      builder: (ctx) => ChangeNotifierProvider.value(
-        value: homeViewModel,
-        child: _TemplateSheet(template: template),
-      ),
-    );
-  }
+  void _showSheet(BuildContext context) => showTemplateSheet(context, template);
 }
 
 class _TemplateSheet extends StatelessWidget {

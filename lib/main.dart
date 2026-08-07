@@ -1,13 +1,11 @@
 import 'package:aadat/core/supabase_config.dart';
 import 'package:aadat/ui/auth/login_page.dart';
 import 'package:aadat/ui/home/view_models/home_viewmodel.dart';
-import 'package:aadat/ui/home/widgets/home_page.dart';
-import 'package:flutter/material.dart';
 import 'package:aadat/ui/home/widgets/calendar_page.dart';
 import 'package:aadat/ui/home/widgets/habits_page.dart';
-import 'package:aadat/ui/home/widgets/metrics_page.dart';
-import 'package:aadat/ui/home/widgets/resources_page.dart';
+import 'package:aadat/ui/home/widgets/home_page.dart';
 import 'package:aadat/ui/settings/settings_viewmodel.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -176,31 +174,21 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    Widget page;
+    final Widget page;
     switch (selectedIndex) {
-      case 0:
-        page = HomePage();
       case 1:
-        page = HabitsPage();
+        page = const HabitsPage();
       case 2:
-        page = CalendarPage();
-      case 3:
-        page = MetricsPage();
-      case 4:
-        page = ResourcesPage();
+        page = const CalendarPage();
       default:
-        page = HomePage();
+        page = const HomePage();
     }
 
     return Scaffold(
       body: page,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (value) {
-          setState(() {
-            selectedIndex = value;
-          });
-        },
+        onDestinationSelected: (value) => setState(() => selectedIndex = value),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -216,16 +204,6 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Calendar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights_rounded),
-            label: 'Metrics',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bookmark_border_outlined),
-            selectedIcon: Icon(Icons.bookmark_rounded),
-            label: 'Resources',
           ),
         ],
       ),
