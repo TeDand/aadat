@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>aadat sends reminders when habit deadlines are approaching and celebrates your milestones.</string>
 </dict>
 </plist>
