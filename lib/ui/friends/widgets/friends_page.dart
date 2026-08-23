@@ -41,19 +41,42 @@ class _FriendsPageBody extends StatelessWidget {
       ),
       body: vm.loading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => context.read<FriendsViewModel>().fetchFriendships(),
-              child: _FriendsList(vm: vm),
-            ),
+          : vm.error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(vm.error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: scheme.onSurfaceVariant)),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () =>
+                            context.read<FriendsViewModel>().fetchFriendships(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: () =>
+                      context.read<FriendsViewModel>().fetchFriendships(),
+                  child: _FriendsList(vm: vm),
+                ),
     );
   }
 
-  void _showAddFriendDialog(BuildContext context) {
+  void _showAddFriendDialog(BuildContext context) async {
     final vm = context.read<FriendsViewModel>();
-    showDialog<void>(
+    final sentTo = await showDialog<String?>(
       context: context,
       builder: (ctx) => _AddFriendDialog(vm: vm),
     );
+    if (sentTo != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Friend request sent to $sentTo')),
+      );
+    }
   }
 }
 
@@ -311,7 +334,7 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
         _sending = false;
       });
     } else {
-      Navigator.pop(context);
+      Navigator.pop(context, email); // return email so parent can show snackbar
     }
   }
 
