@@ -14,25 +14,53 @@ class FriendRepository {
         .limit(1);
     if (rows.isEmpty) return null;
     final profile = FriendProfile.fromJson(rows.first);
-    if (profile.id == _uid) return null; // can't add yourself
+    if (profile.id == _uid) return null;
     return profile;
   }
 
   /// Fetch all friendships (pending + accepted) for the current user,
-  /// with the other person's profile joined.
+  /// then separately fetch the other person's profile for each.
   Future<List<Friendship>> fetchFriendships() async {
-    final rows = await _db.from('friendships').select('''
-      id,
-      requester_id,
-      addressee_id,
-      status,
-      requester_profile:profiles!friendships_requester_id_fkey (id, email, display_name),
-      addressee_profile:profiles!friendships_addressee_id_fkey (id, email, display_name)
-    ''').or('requester_id.eq.$_uid,addressee_id.eq.$_uid');
+    final friendshipRows = await _db
+        .from('friendships')
+        .select('id, requester_id, addressee_id, status')
+        .or('requester_id.eq.$_uid,addressee_id.eq.$_uid');
 
-    return (rows as List)
-        .map((r) => Friendship.fromJson(r as Map<String, dynamic>, _uid))
-        .toList();
+    if (friendshipRows.isEmpty) return [];
+
+    // Collect the IDs of the other party in each friendship.
+    final otherIds = <String>{};
+    for (final row in friendshipRows) {
+      final requesterId = row['requester_id'] as String;
+      final addresseeId = row['addressee_id'] as String;
+      otherIds.add(requesterId == _uid ? addresseeId : requesterId);
+    }
+
+    // Fetch those profiles in one query.
+    final profileRows = await _db
+        .from('profiles')
+        .select('id, email, display_name')
+        .inFilter('id', otherIds.toList());
+
+    final profiles = <String, FriendProfile>{
+      for (final p in profileRows)
+        p['id'] as String: FriendProfile.fromJson(p),
+    };
+
+    return friendshipRows.map((row) {
+      final requesterId = row['requester_id'] as String;
+      final addresseeId = row['addressee_id'] as String;
+      final otherId = requesterId == _uid ? addresseeId : requesterId;
+      return Friendship(
+        id: row['id'] as int,
+        requesterId: requesterId,
+        addresseeId: addresseeId,
+        status: row['status'] == 'accepted'
+            ? FriendshipStatus.accepted
+            : FriendshipStatus.pending,
+        otherProfile: profiles[otherId],
+      );
+    }).toList();
   }
 
   /// Send a friend request to [addresseeId].
@@ -65,6 +93,6 @@ class FriendRepository {
         .select('id')
         .or('and(requester_id.eq.$_uid,addressee_id.eq.$otherId),and(requester_id.eq.$otherId,addressee_id.eq.$_uid)')
         .limit(1);
-    return (rows as List).isNotEmpty;
+    return rows.isNotEmpty;
   }
 }
