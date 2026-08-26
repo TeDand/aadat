@@ -41,10 +41,28 @@ create table public.completions (
 
 alter table public.completions enable row level security;
 
-create policy "users manage own completions"
-  on public.completions for all
-  using  (auth.uid() = user_id)
+-- Split into separate policies so joint-goal partners can read each other's completions.
+create policy "users insert own completions"
+  on public.completions for insert
   with check (auth.uid() = user_id);
+
+create policy "users delete own completions"
+  on public.completions for delete
+  using (auth.uid() = user_id);
+
+create policy "users select completions"
+  on public.completions for select
+  using (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.joint_goals jg
+      where jg.status = 'active'
+        and (
+          (jg.initiator_id = auth.uid() and jg.partner_habit_id = completions.habit_id)
+          or (jg.partner_id  = auth.uid() and jg.initiator_habit_id = completions.habit_id)
+        )
+    )
+  );
 
 -- ─── Notes ─────────────────────────────────────────────────────────────────
 -- note_key format: '{habitId}|yyyy-MM-dd'
@@ -135,6 +153,50 @@ create policy "either party can remove"
 
 grant select, insert, update, delete on public.friendships to authenticated;
 grant usage, select on sequence public.friendships_id_seq to authenticated;
+
+-- ─── Joint Goals ───────────────────────────────────────────────────────────
+-- Two friends commit to the same habit for a fixed time window.
+-- On creation the initiator's habit_id is stored; on acceptance the partner's
+-- habit_id is added and status moves to 'active'.
+
+create table public.joint_goals (
+  id                  bigserial    primary key,
+  initiator_id        uuid         not null references auth.users(id) on delete cascade,
+  partner_id          uuid         not null references auth.users(id) on delete cascade,
+  habit_title         text         not null,
+  habit_description   text         not null default '',
+  habit_category      text         not null default '',
+  recurrence          text         not null default 'daily',
+  start_date          date         not null default current_date,
+  end_date            date         not null,
+  initiator_habit_id  bigint       references public.habits(id) on delete set null,
+  partner_habit_id    bigint       references public.habits(id) on delete set null,
+  status              text         not null default 'pending',
+  created_at          timestamptz  not null default now(),
+  check (initiator_id <> partner_id),
+  check (status in ('pending', 'active', 'declined', 'cancelled'))
+);
+
+alter table public.joint_goals enable row level security;
+
+create policy "participants see their joint goals"
+  on public.joint_goals for select
+  using (auth.uid() = initiator_id or auth.uid() = partner_id);
+
+create policy "initiator creates joint goals"
+  on public.joint_goals for insert
+  with check (auth.uid() = initiator_id);
+
+create policy "participants update joint goals"
+  on public.joint_goals for update
+  using (auth.uid() = initiator_id or auth.uid() = partner_id);
+
+create policy "participants delete joint goals"
+  on public.joint_goals for delete
+  using (auth.uid() = initiator_id or auth.uid() = partner_id);
+
+grant select, insert, update, delete on public.joint_goals to authenticated;
+grant usage, select on sequence public.joint_goals_id_seq to authenticated;
 
 -- ─── Grants ────────────────────────────────────────────────────────────────
 -- RLS policies filter rows, but the authenticated role also needs base table

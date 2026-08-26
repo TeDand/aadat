@@ -32,6 +32,17 @@ class HabitService {
     return 'habit added!';
   }
 
+  /// Inserts a habit and returns its new database ID.
+  /// Used by joint goals to link the created habit back to the goal record.
+  Future<int?> insertAndGetId(Habit habit) async {
+    final row = await _client
+        .from('habits')
+        .insert(_toRow(habit))
+        .select('id')
+        .single();
+    return row['id'] as int?;
+  }
+
   Future<String> deleteHabit(Habit habit) async {
     if (habit.id == null) return 'habit not found';
     await _client.from('habits').delete().eq('id', habit.id!);
